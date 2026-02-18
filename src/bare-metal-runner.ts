@@ -101,7 +101,7 @@ function setupGroupSession(group: RegisteredGroup): string {
           env: {
             // Enable agent swarms (subagent orchestration)
             CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-            // Load CLAUDE.md from additional mounted directories
+            // Load AGENTS.md from additional mounted directories
             CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
             // Enable Claude's memory feature
             CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',

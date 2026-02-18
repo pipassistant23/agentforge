@@ -53,7 +53,7 @@ export async function initializeQMD(config: QMDConfig): Promise<void> {
     'Archived session transcripts from past conversations');
 
   await addCollection('workspace', workspaceDir, '*.md',
-    'Workspace files including CLAUDE.md and other docs');
+    'Workspace files including AGENTS.md and other docs');
 
   console.error(`[QMD] Collections initialized for ${groupFolder}`);
 }
