@@ -141,7 +141,13 @@ function setupGroupSession(group: RegisteredGroup): string {
   // AGENTS.md is NOT synced - it's group-specific
   const groupWorkspace = path.join(GROUPS_DIR, group.folder);
   const globalWorkspace = path.join(GROUPS_DIR, 'global');
-  const sharedTemplateFiles = ['SOUL.md', 'TOOLS.md', 'IDENTITY.md', 'BOOTSTRAP.md', 'HEARTBEAT.md'];
+  const sharedTemplateFiles = [
+    'SOUL.md',
+    'TOOLS.md',
+    'IDENTITY.md',
+    'BOOTSTRAP.md',
+    'HEARTBEAT.md',
+  ];
 
   for (const templateFile of sharedTemplateFiles) {
     const srcFile = path.join(globalWorkspace, templateFile);
@@ -195,7 +201,11 @@ function setupGroupSession(group: RegisteredGroup): string {
       tasks: {},
       version: '1.0.0',
     };
-    fs.writeFileSync(heartbeatStatePath, JSON.stringify(initialState, null, 2), 'utf-8');
+    fs.writeFileSync(
+      heartbeatStatePath,
+      JSON.stringify(initialState, null, 2),
+      'utf-8',
+    );
   }
 
   return groupSessionsDir;

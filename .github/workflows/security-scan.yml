@@ -55,6 +55,7 @@ jobs:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    continue-on-error: true  # Requires GitHub Advanced Security / Code Scanning to be enabled in repo settings
 
     steps:
       - name: Checkout
