@@ -40,7 +40,7 @@ AgentForge is a single Node.js process that bridges Telegram and the Claude Agen
                           │       ▼                                               │
                           │  Claude Agent SDK (query loop)                        │
                           │       │  tools: Bash, Read/Write, WebSearch, etc.    │
-                          │       │  MCP: nanoclaw (IPC), qmd (memory)           │
+                          │       │  MCP: agentforge (IPC), qmd (memory)         │
                           │       │                                               │
                           │  IPC polling (500ms) ◄──── /data/ipc/{group}/input/ │
                           │       │                                               │
@@ -214,7 +214,7 @@ User sends second message while agent is still processing first
 ### Agent-Initiated Message (via MCP Tool)
 
 ```
-Agent calls mcp__nanoclaw__send_message(text)
+Agent calls mcp__agentforge__send_message(text)
     → ipc-mcp-stdio.ts writes JSON to data/ipc/{group}/messages/
     → IPC watcher (1s poll) reads the file
     → Calls channel.sendMessage() — message appears in Telegram

@@ -315,7 +315,7 @@ Telegram ───────────►│  TelegramChannel (grammy pollin
                      │                                           │
                      │  Claude Agent SDK (query loop)            │
                      │    tools: Bash, Read/Write, WebSearch     │
-                     │    MCP: nanoclaw (IPC), qmd (memory)     │
+                     │    MCP: agentforge (IPC), qmd (memory)   │
                      │                                           │
                      │  IPC polling ◄── /data/ipc/{group}/input/│
                      └───────┬──────────────────────────────────┘

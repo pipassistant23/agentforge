@@ -460,7 +460,7 @@ async function runQuery(
         'TeamCreate', 'TeamDelete', 'SendMessage',
         'TodoWrite', 'ToolSearch', 'Skill',
         'NotebookEdit',
-        'mcp__nanoclaw__*',
+        'mcp__agentforge__*',
         'mcp__qmd__*'
       ],
       env: sdkEnv,
@@ -468,7 +468,7 @@ async function runQuery(
       allowDangerouslySkipPermissions: true,
       settingSources: ['project', 'user'],
       mcpServers: {
-        nanoclaw: {
+        agentforge: {
           command: 'node',
           args: [mcpServerPath],
           env: {
