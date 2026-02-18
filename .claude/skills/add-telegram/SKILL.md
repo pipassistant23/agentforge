@@ -5,7 +5,7 @@ description: Add Telegram as a channel. Can replace WhatsApp entirely or run alo
 
 # Add Telegram Channel
 
-This skill adds Telegram support to NanoClaw. Users can choose to:
+This skill adds Telegram support to AgentForge. Users can choose to:
 
 1. **Replace WhatsApp** - Use Telegram as the only messaging channel
 2. **Add alongside WhatsApp** - Both channels active
@@ -81,7 +81,7 @@ Before making changes, ask:
 
 ## Architecture
 
-NanoClaw uses a **Channel abstraction** (`Channel` interface in `src/types.ts`). Each messaging platform implements this interface. Key files:
+AgentForge uses a **Channel abstraction** (`Channel` interface in `src/types.ts`). Each messaging platform implements this interface. Key files:
 
 | File | Purpose |
 |------|---------|

@@ -135,7 +135,7 @@ EOF
 
     cat > "$UNIT_PATH" <<UNITEOF
 [Unit]
-Description=NanoClaw Personal Assistant
+Description=Pipbot Personal Assistant
 After=network.target
 
 [Service]

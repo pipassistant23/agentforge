@@ -25,7 +25,7 @@ if [ -z "$RUNTIME" ]; then
   cat <<EOF
 === NANOCLAW SETUP: SETUP_CONTAINER ===
 RUNTIME: unknown
-IMAGE: nanoclaw-agent:latest
+IMAGE: pipbot-agent:latest
 BUILD_OK: false
 TEST_OK: false
 STATUS: failed
@@ -36,7 +36,7 @@ EOF
   exit 4
 fi
 
-IMAGE="nanoclaw-agent:latest"
+IMAGE="pipbot-agent:latest"
 
 # Determine build/run commands based on runtime
 case "$RUNTIME" in

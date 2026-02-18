@@ -1,6 +1,6 @@
 ---
 name: add-voice-transcription
-description: Add voice message transcription to NanoClaw using OpenAI's Whisper API. Automatically transcribes WhatsApp voice notes so the agent can read and respond to them.
+description: Add voice message transcription to AgentForge using OpenAI's Whisper API. Automatically transcribes WhatsApp voice notes so the agent can read and respond to them.
 ---
 
 # Add Voice Message Transcription
@@ -40,7 +40,7 @@ Read `package.json` and add the `openai` package to dependencies:
 }
 ```
 
-Then install it. **IMPORTANT:** The OpenAI SDK requires Zod v3 as an optional peer dependency, but NanoClaw uses Zod v4. This conflict is guaranteed, so always use `--legacy-peer-deps`:
+Then install it. **IMPORTANT:** The OpenAI SDK requires Zod v3 as an optional peer dependency, but AgentForge uses Zod v4. This conflict is guaranteed, so always use `--legacy-peer-deps`:
 
 ```bash
 npm install --legacy-peer-deps
@@ -298,14 +298,14 @@ if (registeredGroups[chatJid]) {
 
 ### Step 6: Fix Orphan Container Cleanup (CRITICAL)
 
-**This step is essential.** When the NanoClaw service restarts (e.g., `launchctl kickstart -k`), the running container is detached but NOT killed. The new service instance spawns a fresh container, but the orphan keeps running and shares the same IPC mount directory. Both containers race to read IPC input files, causing the new container to randomly miss messages — making it appear like the agent doesn't respond.
+**This step is essential.** When the AgentForge service restarts (e.g., `launchctl kickstart -k`), the running container is detached but NOT killed. The new service instance spawns a fresh container, but the orphan keeps running and shares the same IPC mount directory. Both containers race to read IPC input files, causing the new container to randomly miss messages — making it appear like the agent doesn't respond.
 
 The existing cleanup code in `ensureContainerSystemRunning()` in `src/index.ts` uses `container ls --format {{.Names}}` which **silently fails** on Apple Container (only `json` and `table` are valid format options). The catch block swallows the error, so orphans are never cleaned up.
 
-Find the orphan cleanup block in `ensureContainerSystemRunning()` (the section starting with `// Kill and clean up orphaned NanoClaw containers from previous runs`) and replace it with:
+Find the orphan cleanup block in `ensureContainerSystemRunning()` (the section starting with `// Kill and clean up orphaned AgentForge containers from previous runs`) and replace it with:
 
 ```typescript
-  // Kill and clean up orphaned NanoClaw containers from previous runs
+  // Kill and clean up orphaned AgentForge containers from previous runs
   try {
     const listJson = execSync('container ls -a --format json', {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -313,7 +313,7 @@ Find the orphan cleanup block in `ensureContainerSystemRunning()` (the section s
     });
     const containers = JSON.parse(listJson) as Array<{ configuration: { id: string }; status: string }>;
     const nanoclawContainers = containers.filter(
-      (c) => c.configuration.id.startsWith('nanoclaw-'),
+      (c) => c.configuration.id.startsWith('pipbot-'),
     );
     const running = nanoclawContainers
       .filter((c) => c.status === 'running')
@@ -344,13 +344,13 @@ Before restarting the service, kill any orphaned containers manually to ensure a
 container ls -a --format json | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-nc = [c['configuration']['id'] for c in data if c['configuration']['id'].startswith('nanoclaw-')]
+nc = [c['configuration']['id'] for c in data if c['configuration']['id'].startswith('pipbot-')]
 if nc: print(' '.join(nc))
 " | xargs -r container stop 2>/dev/null
 container ls -a --format json | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-nc = [c['configuration']['id'] for c in data if c['configuration']['id'].startswith('nanoclaw-')]
+nc = [c['configuration']['id'] for c in data if c['configuration']['id'].startswith('pipbot-')]
 if nc: print(' '.join(nc))
 " | xargs -r container rm 2>/dev/null
 echo "Orphaned containers cleaned"
@@ -369,7 +369,7 @@ sleep 3 && launchctl list | grep nanoclaw
 container ls -a --format json | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-nc = [c for c in data if c['configuration']['id'].startswith('nanoclaw-')]
+nc = [c for c in data if c['configuration']['id'].startswith('pipbot-')]
 print(f'{len(nc)} nanoclaw container(s)')
 for c in nc: print(f'  {c[\"configuration\"][\"id\"]} - {c[\"status\"]}')
 "
@@ -439,7 +439,7 @@ The architecture supports multiple providers. To add Groq, Deepgram, or local Wh
 container ls -a --format json | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-nc = [c for c in data if c['configuration']['id'].startswith('nanoclaw-')]
+nc = [c for c in data if c['configuration']['id'].startswith('pipbot-')]
 print(f'{len(nc)} nanoclaw container(s):')
 for c in nc: print(f'  {c[\"configuration\"][\"id\"]} - {c[\"status\"]}')
 "
@@ -452,13 +452,13 @@ If you see more than one running container, kill the orphans:
 container ls -a --format json | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-running = [c['configuration']['id'] for c in data if c['configuration']['id'].startswith('nanoclaw-') and c['status'] == 'running']
+running = [c['configuration']['id'] for c in data if c['configuration']['id'].startswith('pipbot-') and c['status'] == 'running']
 if running: print(' '.join(running))
 " | xargs -r container stop 2>/dev/null
 container ls -a --format json | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-nc = [c['configuration']['id'] for c in data if c['configuration']['id'].startswith('nanoclaw-')]
+nc = [c['configuration']['id'] for c in data if c['configuration']['id'].startswith('pipbot-')]
 if nc: print(' '.join(nc))
 " | xargs -r container rm 2>/dev/null
 launchctl kickstart -k gui/$(id -u)/com.nanoclaw
@@ -494,7 +494,7 @@ const __dirname = dirname(__filename);
 
 ### Dependency conflicts (Zod versions)
 
-The OpenAI SDK requires Zod v3, but NanoClaw uses Zod v4. This conflict is guaranteed — always use:
+The OpenAI SDK requires Zod v3, but AgentForge uses Zod v4. This conflict is guaranteed — always use:
 ```bash
 npm install --legacy-peer-deps
 ```

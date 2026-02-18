@@ -1,9 +1,9 @@
 ---
 name: setup
-description: Run initial NanoClaw setup. Use when user wants to install dependencies, authenticate WhatsApp, register their main channel, or start the background services. Triggers on "setup", "install", "configure nanoclaw", or first-time setup requests.
+description: Run initial AgentForge setup. Use when user wants to install dependencies, authenticate WhatsApp, register their main channel, or start the background services. Triggers on "setup", "install", "configure pipbot", or first-time setup requests.
 ---
 
-# NanoClaw Setup
+# AgentForge Setup
 
 Run setup scripts automatically. Only pause when user action is required (WhatsApp authentication, configuration choices). Scripts live in `.claude/skills/setup/scripts/` and emit structured status blocks to stdout. Verbose logs go to `logs/setup.log`.
 
@@ -148,7 +148,7 @@ Do NOT show options that don't apply to the user's setup. For example, don't off
 2. **If BUILD=failed:** Read `logs/setup.log`, fix the TypeScript error, re-run.
 3. **If GROUPS_IN_DB=0:** Check `logs/setup.log` for the sync output. Common causes: WhatsApp auth expired (re-run step 5), connection timeout (re-run sync script with longer timeout).
 4. Run `./.claude/skills/setup/scripts/05b-list-groups.sh` to get groups (pipe-separated JID|name lines). Do NOT display the output to the user.
-5. Pick the most likely candidates (e.g. groups with the trigger word or "NanoClaw" in the name, small/solo groups) and present them as AskUserQuestion options — show names only, not JIDs. Include an "Other" option if their group isn't listed. If they pick Other, search by name in the DB or re-run with a higher limit.
+5. Pick the most likely candidates (e.g. groups with the trigger word or "AgentForge" in the name, small/solo groups) and present them as AskUserQuestion options — show names only, not JIDs. Include an "Other" option if their group isn't listed. If they pick Other, search by name in the DB or re-run with a higher limit.
 
 ## 8. Register Channel
 
@@ -162,7 +162,7 @@ Run `./.claude/skills/setup/scripts/06-register-channel.sh` with args:
 
 ## 9. Mount Allowlist
 
-AskUserQuestion: Want the agent to access directories outside the NanoClaw project? (Git repos, project folders, documents, etc.)
+AskUserQuestion: Want the agent to access directories outside the AgentForge project? (Git repos, project folders, documents, etc.)
 
 **If no:** Run `./.claude/skills/setup/scripts/07-configure-mounts.sh --empty`
 

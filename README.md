@@ -1,183 +1,240 @@
-<p align="center">
-  <img src="assets/nanoclaw-logo.png" alt="NanoClaw" width="400">
-</p>
+<div align="center">
+  <img src="assets/logo.png" alt="AgentForge Logo" width="400">
 
-<p align="center">
-  My personal Claude assistant that runs securely in containers. Lightweight and built to be understood and customized for your own needs.
-</p>
+  <br/>
 
-<p align="center">
-  <a href="README_zh.md">中文</a>&nbsp; • &nbsp;
-  <a href="https://discord.gg/VGWXrf8x"><img src="https://img.shields.io/discord/1470188214710046894?label=Discord&logo=discord&v=2" alt="Discord" valign="middle"></a>&nbsp; • &nbsp;
-  <a href="repo-tokens"><img src="repo-tokens/badge.svg" alt="34.9k tokens, 17% of context window" valign="middle"></a>
-</p>
+  ![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
+  ![License](https://img.shields.io/badge/license-MIT-blue)
+  ![Platform](https://img.shields.io/badge/platform-linux-lightgrey)
+  ![Telegram](https://img.shields.io/badge/telegram-bot-blue?logo=telegram)
+  ![Claude](https://img.shields.io/badge/Claude-AI-orange)
+  ![Tokens](repo-tokens/badge.svg)
 
-**New:** First AI assistant to support [Agent Swarms](https://code.claude.com/docs/en/agent-teams). Spin up teams of agents that collaborate in your chat.
+  <!-- token-count --><!-- /token-count -->
 
-## Why I Built This
+  # AgentForge
 
-[OpenClaw](https://github.com/openclaw/openclaw) is an impressive project with a great vision. But I can't sleep well running software I don't understand with access to my life. OpenClaw has 52+ modules, 8 config management files, 45+ dependencies, and abstractions for 15 channel providers. Security is application-level (allowlists, pairing codes) rather than OS isolation. Everything runs in one Node process with shared memory.
+  Personal Claude assistant running on Linux via Telegram. Forked from [NanoClaw](https://github.com/gavrielc/nanoclaw) with simplified architecture: **Telegram-only, baremetal-only**.
+</div>
 
-NanoClaw gives you the same core functionality in a codebase you can understand in 8 minutes. One process. A handful of files. Agents run in actual Linux containers with filesystem isolation, not behind permission checks.
+## What is AgentForge?
+
+AgentForge is a personal AI assistant that:
+- Runs Claude Agent SDK as baremetal Node.js processes (no containers)
+- Connects only to Telegram (WhatsApp removed for simplicity)
+- Isolates each chat group with dedicated workspaces
+- Supports Agent Swarms via bot pools (subagents get unique bot identities)
+- Runs as a systemd service on Linux
 
 ## Quick Start
 
-```bash
-git clone https://github.com/gavrielc/nanoclaw.git
-cd nanoclaw
-claude
-```
-
-Then run `/setup`. Claude Code handles everything: dependencies, authentication, container setup, service configuration.
-
-## Philosophy
-
-**Small enough to understand.** One process, a few source files. No microservices, no message queues, no abstraction layers. Have Claude Code walk you through it.
-
-**Secure by isolation.** Agents run in Linux containers (Apple Container on macOS, or Docker). They can only see what's explicitly mounted. Bash access is safe because commands run inside the container, not on your host.
-
-**Built for one user.** This isn't a framework. It's working software that fits my exact needs. You fork it and have Claude Code make it match your exact needs.
-
-**Customization = code changes.** No configuration sprawl. Want different behavior? Modify the code. The codebase is small enough that this is safe.
-
-**AI-native.** No installation wizard; Claude Code guides setup. No monitoring dashboard; ask Claude what's happening. No debugging tools; describe the problem, Claude fixes it.
-
-**Skills over features.** Contributors shouldn't add features (e.g. support for Telegram) to the codebase. Instead, they contribute [claude code skills](https://code.claude.com/docs/en/skills) like `/add-telegram` that transform your fork. You end up with clean code that does exactly what you need.
-
-**Best harness, best model.** This runs on Claude Agent SDK, which means you're running Claude Code directly. The harness matters. A bad harness makes even smart models seem dumb, a good harness gives them superpowers. Claude Code is (IMO) the best harness available.
-
-## What It Supports
-
-- **WhatsApp I/O** - Message Claude from your phone
-- **Isolated group context** - Each group has its own `CLAUDE.md` memory, isolated filesystem, and runs in its own container sandbox with only that filesystem mounted
-- **Main channel** - Your private channel (self-chat) for admin control; every other group is completely isolated
-- **Scheduled tasks** - Recurring jobs that run Claude and can message you back
-- **Web access** - Search and fetch content
-- **Container isolation** - Agents sandboxed in Apple Container (macOS) or Docker (macOS/Linux)
-- **Agent Swarms** - Spin up teams of specialized agents that collaborate on complex tasks (first personal AI assistant to support this)
-- **Optional integrations** - Add Gmail (`/add-gmail`) and more via skills
-
-## Usage
-
-Talk to your assistant with the trigger word (default: `@Andy`):
-
-```
-@Andy send an overview of the sales pipeline every weekday morning at 9am (has access to my Obsidian vault folder)
-@Andy review the git history for the past week each Friday and update the README if there's drift
-@Andy every Monday at 8am, compile news on AI developments from Hacker News and TechCrunch and message me a briefing
-```
-
-From the main channel (your self-chat), you can manage groups and tasks:
-```
-@Andy list all scheduled tasks across groups
-@Andy pause the Monday briefing task
-@Andy join the Family Chat group
-```
-
-## Customizing
-
-There are no configuration files to learn. Just tell Claude Code what you want:
-
-- "Change the trigger word to @Bob"
-- "Remember in the future to make responses shorter and more direct"
-- "Add a custom greeting when I say good morning"
-- "Store conversation summaries weekly"
-
-Or run `/customize` for guided changes.
-
-The codebase is small enough that Claude can safely modify it.
-
-## Contributing
-
-**Don't add features. Add skills.**
-
-If you want to add Telegram support, don't create a PR that adds Telegram alongside WhatsApp. Instead, contribute a skill file (`.claude/skills/add-telegram/SKILL.md`) that teaches Claude Code how to transform a NanoClaw installation to use Telegram.
-
-Users then run `/add-telegram` on their fork and get clean code that does exactly what they need, not a bloated system trying to support every use case.
-
-### RFS (Request for Skills)
-
-Skills we'd love to see:
-
-**Communication Channels**
-- `/add-telegram` - Add Telegram as channel. Should give the user option to replace WhatsApp or add as additional channel. Also should be possible to add it as a control channel (where it can trigger actions) or just a channel that can be used in actions triggered elsewhere
-- `/add-slack` - Add Slack
-- `/add-discord` - Add Discord
-
-**Platform Support**
-- `/setup-windows` - Windows via WSL2 + Docker
-
-**Session Management**
-- `/add-clear` - Add a `/clear` command that compacts the conversation (summarizes context while preserving critical information in the same session). Requires figuring out how to trigger compaction programmatically via the Claude Agent SDK.
-
-## Requirements
-
-- macOS or Linux
+**Requirements:**
+- Linux
 - Node.js 20+
 - [Claude Code](https://claude.ai/download)
-- [Apple Container](https://github.com/apple/container) (macOS) or [Docker](https://docker.com/products/docker-desktop) (macOS/Linux)
+- Telegram bot token
+
+**Setup:**
+
+1. Clone and install:
+```bash
+cd /path/to/agentforge
+npm install
+npm run build
+```
+
+2. Configure `.env`:
+```bash
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_BOT_POOL=pool_token1,pool_token2  # Optional: for agent swarms
+ANTHROPIC_API_KEY=your_key_here
+```
+
+3. Set up systemd service (example at `/etc/systemd/system/agentforge.service`):
+```ini
+[Unit]
+Description=AgentForge - Personal Claude Assistant
+After=network.target
+
+[Service]
+Type=simple
+User=your_username
+WorkingDirectory=/path/to/agentforge
+EnvironmentFile=/path/to/agentforge/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+4. Start the service:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable agentforge.service
+sudo systemctl start agentforge.service
+sudo journalctl -u agentforge.service -f  # Watch logs
+```
 
 ## Architecture
 
 ```
-WhatsApp (baileys) --> SQLite --> Polling loop --> Container (Claude Agent SDK) --> Response
+Telegram (Grammy) --> SQLite --> Polling loop --> Baremetal agent (Claude SDK) --> Response
 ```
 
-Single Node.js process. Agents execute in isolated Linux containers with mounted directories. Per-group message queue with concurrency control. IPC via filesystem.
+**Single Node.js process:**
+- `src/index.ts` - Main orchestrator
+- `src/channels/telegram.ts` - Telegram bot with pool support
+- `src/bare-metal-runner.ts` - Spawns agents as Node processes
+- `src/ipc.ts` - File-based IPC for bidirectional communication
 
-Key files:
-- `src/index.ts` - Orchestrator: state, message loop, agent invocation
-- `src/channels/whatsapp.ts` - WhatsApp connection, auth, send/receive
-- `src/ipc.ts` - IPC watcher and task processing
-- `src/router.ts` - Message formatting and outbound routing
-- `src/group-queue.ts` - Per-group queue with global concurrency limit
-- `src/container-runner.ts` - Spawns streaming agent containers
-- `src/task-scheduler.ts` - Runs scheduled tasks
-- `src/db.ts` - SQLite operations (messages, groups, sessions, state)
-- `groups/*/CLAUDE.md` - Per-group memory
+**Per-group isolation:**
+- Each chat gets `/data/groups/{groupFolder}/` directory
+- Each agent runs in its own process with environment-based workspace paths
+- IPC directory: `/data/ipc/{groupFolder}/`
+- Claude memory: `groups/{name}/CLAUDE.md`
 
-## FAQ
+## Features
 
-**Why WhatsApp and not Telegram/Signal/etc?**
+- ✅ **Telegram-only** - Simplified from multi-channel
+- ✅ **Agent Swarms** - Bot pool assigns unique identities to subagents
+- ✅ **Baremetal execution** - Fast startup (~100-200ms vs 3-5s containers)
+- ✅ **Per-group isolation** - Dedicated workspaces, isolated memory
+- ✅ **Systemd service** - Runs persistently, auto-restarts
+- ✅ **File-based IPC** - Bidirectional communication between orchestrator and agents
 
-Because I use WhatsApp. Fork it and run a skill to change it. That's the whole point.
+## Development
 
-**Why Apple Container instead of Docker?**
+```bash
+npm run build        # Compile TypeScript to dist/
+npm test            # Run tests
+npm run dev         # Run directly with tsx (no build)
+```
 
-On macOS, Apple Container is lightweight, fast, and optimized for Apple silicon. But Docker is also fully supported—during `/setup`, you can choose which runtime to use. On Linux, Docker is used automatically.
+**Important:** Always restart the service after building - the running process doesn't auto-reload!
 
-**Can I run this on Linux?**
+Check process start time vs dist build time to verify you're running fresh code:
+```bash
+sudo systemctl status agentforge.service  # Check start time
+ls -lh dist/index.js               # Check build time
+```
 
-Yes. Run `/setup` and it will automatically configure Docker as the container runtime. Thanks to [@dotsetgreg](https://github.com/dotsetgreg) for contributing the `/convert-to-docker` skill.
+## Usage
 
-**Is this secure?**
+Talk to your bot in Telegram using the trigger word (default: `@Andy`):
 
-Agents run in containers, not behind application-level permission checks. They can only access explicitly mounted directories. You should still review what you're running, but the codebase is small enough that you actually can. See [docs/SECURITY.md](docs/SECURITY.md) for the full security model.
+```
+@Andy what's the weather?
+@Andy summarize this article: https://...
+@Andy schedule a reminder for tomorrow at 9am
+```
 
-**Why no configuration files?**
+From your main chat (1:1 with the bot), you can manage groups and tasks:
+```
+@Andy list all scheduled tasks
+@Andy pause the morning briefing task
+```
 
-We don't want configuration sprawl. Every user should customize it to so that the code matches exactly what they want rather than configuring a generic system. If you like having config files, tell Claude to add them.
+## Scheduled Tasks
 
-**How do I debug issues?**
+Create recurring tasks that run Claude and message you back:
 
-Ask Claude Code. "Why isn't the scheduler running?" "What's in the recent logs?" "Why did this message not get a response?" That's the AI-native approach.
+```
+@Andy every weekday at 9am, check my calendar and send me a summary
+@Andy every Monday at 8am, compile AI news from Hacker News and message me
+```
 
-**Why isn't the setup working for me?**
+## Agent Swarms
 
-I don't know. Run `claude`, then run `/debug`. If claude finds an issue that is likely affecting other users, open a PR to modify the setup SKILL.md.
+If you configure `TELEGRAM_BOT_POOL` in your `.env`, AgentForge supports Agent Teams/Swarms:
+- Each subagent gets assigned a unique bot from the pool
+- Bots are renamed to match the subagent's role (e.g., "Marine Biologist", "Physicist")
+- Users see which agent is speaking in the chat
 
-**What changes will be accepted into the codebase?**
+Example:
+```
+You: @Andy I need help researching ocean life and physics
 
-Security fixes, bug fixes, and clear improvements to the base configuration. That's it.
+Andy spawns:
+- Subagent "Marine Biologist" → assigned bot token #1 → renamed to "Marine Biologist"
+- Subagent "Physicist" → assigned bot token #2 → renamed to "Physicist"
 
-Everything else (new capabilities, OS compatibility, hardware support, enhancements) should be contributed as skills.
+Chat shows messages from different bots with different names!
+```
 
-This keeps the base system minimal and lets every user customize their installation without inheriting features they don't want.
+## File Structure
 
-## Community
+```
+agentforge/
+├── src/                        # TypeScript source
+│   ├── index.ts               # Main orchestrator
+│   ├── channels/
+│   │   └── telegram.ts        # Telegram bot + pool
+│   ├── bare-metal-runner.ts   # Agent spawner
+│   ├── ipc.ts                 # IPC watcher
+│   ├── router.ts              # Message routing
+│   ├── task-scheduler.ts      # Cron/scheduled tasks
+│   └── db.ts                  # SQLite operations
+├── dist/                       # Compiled JavaScript
+├── groups/                     # Per-group workspaces
+│   ├── global/                # Shared across all groups
+│   │   └── CLAUDE.md          # Agent Teams instructions
+│   └── {groupName}/           # Per-group isolation
+│       ├── CLAUDE.md          # Group-specific memory
+│       └── logs/              # Agent execution logs
+├── data/
+│   ├── ipc/                   # File-based IPC
+│   │   └── {groupFolder}/
+│   │       ├── input/         # Inbound messages
+│   │       ├── messages/      # Outbound messages
+│   │       └── tasks/         # Task operations
+│   └── sessions/              # Claude sessions per group
+├── agent-runner-src/           # Agent runtime source code
+│   ├── src/                   # TypeScript source
+│   └── dist/                  # Compiled agent runtime
+├── skills/                     # Claude Code skills
+└── store/                      # SQLite database
 
-Questions? Ideas? [Join the Discord](https://discord.gg/VGWXrf8x).
+```
+
+## Troubleshooting
+
+**Service won't start:**
+```bash
+sudo journalctl -u agentforge.service -n 50  # Check last 50 log lines
+```
+
+**Agent won't respond:**
+- Check `TELEGRAM_BOT_TOKEN` is set
+- Check `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` is set
+- Check logs: `sudo journalctl -u agentforge.service -f`
+
+**Build errors:**
+```bash
+npm install          # Reinstall dependencies
+npm run build        # Rebuild
+```
+
+**Process still running old code:**
+```bash
+sudo systemctl restart agentforge.service
+ps aux | grep "node.*agentforge"  # Verify only one instance
+```
+
+## Differences from NanoClaw
+
+AgentForge is a simplified fork of NanoClaw with:
+- ❌ **No WhatsApp** - Removed Baileys, QR auth, 86 fewer npm packages
+- ❌ **No containers** - Removed Apple Container/Docker, ~1,500 lines of code deleted
+- ✅ **Telegram-only** - Single messaging platform
+- ✅ **Baremetal-only** - Node.js processes, no containerization
+- ✅ **Linux-focused** - Systemd service, optimized for Linux servers
 
 ## License
 
-MIT
+MIT (inherited from NanoClaw)
+
+## Credits
+
+Forked from [NanoClaw](https://github.com/gavrielc/nanoclaw) by [@gavrielc](https://github.com/gavrielc)

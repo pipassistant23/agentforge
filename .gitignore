@@ -29,4 +29,21 @@ groups/global/*
 .idea/
 .vscode/
 
+# Temporary development docs
+*_IMPLEMENTATION.md
+*_COMPLETE.md
+*_STATUS.md
+*_VERIFICATION.md
+*_CLEANUP.md
+*_MIGRATION.md
+*_FIXES.md
+migrate-*.sql
+possible */
+
+# Development artifacts
+public/
 agents-sdk-docs
+
+# Legacy branding assets (NanoClaw)
+assets/nanoclaw-*
+assets/social-preview.jpg

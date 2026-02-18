@@ -1,18 +1,18 @@
 # Add Parallel AI Integration
 
-Adds Parallel AI MCP integration to NanoClaw for advanced web research capabilities.
+Adds Parallel AI MCP integration to AgentForge for advanced web research capabilities.
 
 ## What This Adds
 
 - **Quick Search** - Fast web lookups using Parallel Search API (free to use)
 - **Deep Research** - Comprehensive analysis using Parallel Task API (asks permission)
-- **Non-blocking Design** - Uses NanoClaw scheduler for result polling (no container blocking)
+- **Non-blocking Design** - Uses AgentForge scheduler for result polling (no container blocking)
 
 ## Prerequisites
 
 User must have:
 1. Parallel AI API key from https://platform.parallel.ai
-2. NanoClaw already set up and running
+2. AgentForge already set up and running
 3. Container system working (Apple Container or Docker)
 
 ## Implementation Steps
@@ -79,7 +79,7 @@ const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'PARALLEL_A
 
 ### 4. Configure MCP Servers in Agent Runner
 
-Update `container/agent-runner/src/index.ts`:
+Update `agent-runner-src/src/index.ts`:
 
 Find the section where `mcpServers` is configured (around line 237-252):
 ```typescript
@@ -231,7 +231,7 @@ The build script will automatically:
 
 Verify the build:
 ```bash
-echo '{}' | container run -i --entrypoint /bin/echo nanoclaw-agent:latest "Container OK"
+echo '{}' | container run -i --entrypoint /bin/echo pipbot-agent:latest "Container OK"
 ```
 
 ### 7. Restart Service

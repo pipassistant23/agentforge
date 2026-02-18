@@ -1,3 +1,4 @@
+import { ASSISTANT_NAME } from './config.js';
 import { Channel, NewMessage } from './types.js';
 
 export function escapeXml(s: string): string {
@@ -20,9 +21,28 @@ export function stripInternalTags(text: string): string {
   return text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
 }
 
-export function formatOutbound(rawText: string): string {
-  const text = stripInternalTags(rawText);
+export function formatOutbound(
+  channelOrText: Channel | string,
+  rawText?: string,
+): string {
+  // Backwards compatibility: if called with just text (string), strip internal tags only
+  if (typeof channelOrText === 'string' && rawText === undefined) {
+    const text = stripInternalTags(channelOrText);
+    if (!text) return '';
+    return text;
+  }
+
+  // New signature: formatOutbound(channel, rawText)
+  const channel = channelOrText as Channel;
+  const text = stripInternalTags(rawText!);
   if (!text) return '';
+
+  // Prefix with assistant name if channel requires it (default: true for backwards compat)
+  const shouldPrefix = channel.prefixAssistantName !== false;
+  if (shouldPrefix) {
+    return `${ASSISTANT_NAME}: ${text}`;
+  }
+
   return text;
 }
 

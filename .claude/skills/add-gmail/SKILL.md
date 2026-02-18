@@ -1,11 +1,11 @@
 ---
 name: add-gmail
-description: Add Gmail integration to NanoClaw. Can be configured as a tool (agent reads/sends emails when triggered from WhatsApp) or as a full channel (emails can trigger the agent, schedule tasks, and receive replies). Guides through GCP OAuth setup and implements the integration.
+description: Add Gmail integration to AgentForge. Can be configured as a tool (agent reads/sends emails when triggered from WhatsApp) or as a full channel (emails can trigger the agent, schedule tasks, and receive replies). Guides through GCP OAuth setup and implements the integration.
 ---
 
 # Add Gmail Integration
 
-This skill adds Gmail capabilities to NanoClaw. It can be configured in two modes:
+This skill adds Gmail capabilities to AgentForge. It can be configured in two modes:
 
 1. **Tool Mode** - Agent can read/send emails, but only when triggered from WhatsApp
 2. **Channel Mode** - Emails can trigger the agent, schedule tasks, and receive email replies
@@ -14,7 +14,7 @@ This skill adds Gmail capabilities to NanoClaw. It can be configured in two mode
 
 Ask the user:
 
-> How do you want to use Gmail with NanoClaw?
+> How do you want to use Gmail with AgentForge?
 >
 > **Option 1: Tool Mode**
 > - Agent can read and send emails when you ask it to
@@ -74,9 +74,9 @@ Wait for user confirmation, then continue:
 >    - Go to **APIs & Services → Credentials** (in the left sidebar)
 >    - Click **+ CREATE CREDENTIALS** at the top
 >    - Select **OAuth client ID**
->    - If prompted for consent screen, choose "External", fill in app name (e.g., "NanoClaw"), your email, and save
+>    - If prompted for consent screen, choose "External", fill in app name (e.g., "AgentForge"), your email, and save
 >    - For Application type, select **Desktop app**
->    - Name it anything (e.g., "NanoClaw Gmail")
+>    - Name it anything (e.g., "AgentForge Gmail")
 >    - Click **Create**
 
 Wait for user confirmation, then continue:
@@ -161,7 +161,7 @@ For Tool Mode, integrate Gmail MCP into the agent runner. Execute these changes 
 
 ### Step 1: Add Gmail MCP to Agent Runner
 
-Read `container/agent-runner/src/index.ts` and find the `mcpServers` config in the `query()` call.
+Read `agent-runner-src/src/index.ts` and find the `mcpServers` config in the `query()` call.
 
 Add `gmail` to the `mcpServers` object:
 
@@ -286,7 +286,7 @@ Ask the user:
 > How should the agent be triggered from email?
 >
 > **Option A: Specific Label**
-> - Create a Gmail label (e.g., "NanoClaw")
+> - Create a Gmail label (e.g., "AgentForge")
 > - Emails with this label trigger the agent
 > - You manually label emails or set up Gmail filters
 >
@@ -341,7 +341,7 @@ Read `src/config.ts` and add this configuration (customize values based on user'
 export const EMAIL_CHANNEL: EmailChannelConfig = {
   enabled: true,
   triggerMode: 'label',  // or 'address' or 'subject'
-  triggerValue: 'NanoClaw',  // the label name, address pattern, or prefix
+  triggerValue: 'AgentForge',  // the label name, address pattern, or prefix
   contextMode: 'thread',
   pollIntervalMs: 60000,  // Check every minute
   replyPrefix: '[Andy] '
@@ -588,7 +588,7 @@ async function runEmailAgent(
 
 ### Step 7: Update IPC for Email Responses (Optional)
 
-If you want the agent to be able to send emails proactively from within a session, read `container/agent-runner/src/ipc-mcp.ts` and add this tool:
+If you want the agent to be able to send emails proactively from within a session, read `agent-runner-src/src/ipc-mcp.ts` and add this tool:
 
 ```typescript
 // Add to the MCP tools
@@ -707,7 +707,7 @@ npx -y @gongrzhe/server-gmail-autoauth-mcp
 
 To remove Gmail entirely:
 
-1. Remove from `container/agent-runner/src/index.ts`:
+1. Remove from `agent-runner-src/src/index.ts`:
    - Delete `gmail` from `mcpServers`
    - Remove `mcp__gmail__*` from `allowedTools`
 
