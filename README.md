@@ -17,7 +17,7 @@
   ![Claude](https://img.shields.io/badge/Claude-AI-orange)
   ![Tokens](repo-tokens/badge.svg)
 
-  <!-- token-count --><!-- /token-count -->
+  <!-- token-count --><a href="https://github.com/pipassistant23/agentforge/tree/main/repo-tokens">39.0k tokens · 20% of context window</a><!-- /token-count -->
 
   # AgentForge
 
