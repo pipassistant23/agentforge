@@ -130,18 +130,18 @@ ls -lh dist/index.js               # Check build time
 
 ## Usage
 
-Talk to your bot in Telegram using the trigger word (default: `@Andy`):
+Talk to your bot in Telegram using the trigger word (default: `@YourBot`):
 
 ```
-@Andy what's the weather?
-@Andy summarize this article: https://...
-@Andy schedule a reminder for tomorrow at 9am
+@YourBot what's the weather?
+@YourBot summarize this article: https://...
+@YourBot schedule a reminder for tomorrow at 9am
 ```
 
 From your main chat (1:1 with the bot), you can manage groups and tasks:
 ```
-@Andy list all scheduled tasks
-@Andy pause the morning briefing task
+@YourBot list all scheduled tasks
+@YourBot pause the morning briefing task
 ```
 
 ## Scheduled Tasks
@@ -149,8 +149,8 @@ From your main chat (1:1 with the bot), you can manage groups and tasks:
 Create recurring tasks that run Claude and message you back:
 
 ```
-@Andy every weekday at 9am, check my calendar and send me a summary
-@Andy every Monday at 8am, compile AI news from Hacker News and message me
+@YourBot every weekday at 9am, check my calendar and send me a summary
+@YourBot every Monday at 8am, compile AI news from Hacker News and message me
 ```
 
 ## Agent Swarms
@@ -162,9 +162,9 @@ If you configure `TELEGRAM_BOT_POOL` in your `.env`, AgentForge supports Agent T
 
 Example:
 ```
-You: @Andy I need help researching ocean life and physics
+You: @YourBot I need help researching ocean life and physics
 
-Andy spawns:
+Your bot spawns:
 - Subagent "Marine Biologist" → assigned bot token #1 → renamed to "Marine Biologist"
 - Subagent "Physicist" → assigned bot token #2 → renamed to "Physicist"
 
@@ -229,19 +229,6 @@ npm run build        # Rebuild
 sudo systemctl restart agentforge.service
 ps aux | grep "node.*agentforge"  # Verify only one instance
 ```
-
-## Differences from NanoClaw
-
-AgentForge is a simplified fork of NanoClaw with:
-- ❌ **No WhatsApp** - Removed Baileys, QR auth, 86 fewer npm packages
-- ❌ **No containers** - Removed Apple Container/Docker, ~1,500 lines of code deleted
-- ✅ **Telegram-only** - Single messaging platform
-- ✅ **Baremetal-only** - Node.js processes, no containerization
-- ✅ **Linux-focused** - Systemd service, optimized for Linux servers
-
-## License
-
-MIT (inherited from NanoClaw)
 
 ## Credits
 

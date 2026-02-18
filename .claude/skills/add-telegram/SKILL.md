@@ -188,7 +188,7 @@ export class TelegramChannel implements Channel {
 
       // Translate Telegram @bot_username mentions into TRIGGER_PATTERN format.
       // Telegram @mentions (e.g., @andy_ai_bot) won't match TRIGGER_PATTERN
-      // (e.g., ^@Andy\b), so we prepend the trigger when the bot is @mentioned.
+      // (e.g., ^@YourBot\b), so we prepend the trigger when the bot is @mentioned.
       const botUsername = ctx.me?.username?.toLowerCase();
       if (botUsername) {
         const entities = ctx.message.entities || [];
@@ -564,7 +564,7 @@ Tell the user:
 
 > Send a message to your registered Telegram chat:
 > - For main chat: Any message works
-> - For non-main: `@Andy hello` or @mention the bot
+> - For non-main: `@YourBot hello` or @mention the bot
 >
 > Check logs: `tail -f logs/nanoclaw.log`
 
@@ -590,7 +590,7 @@ If user wants Telegram-only:
 The bot responds when:
 1. Chat has `requiresTrigger: false` in its registration (e.g., main group)
 2. Bot is @mentioned in Telegram (translated to TRIGGER_PATTERN automatically)
-3. Message matches TRIGGER_PATTERN directly (e.g., starts with @Andy)
+3. Message matches TRIGGER_PATTERN directly (e.g., starts with @YourBot)
 
 Telegram @mentions (e.g., `@andy_ai_bot`) are automatically translated: if the bot is @mentioned and the message doesn't already match TRIGGER_PATTERN, the trigger prefix is prepended before storing. This ensures @mentioning the bot always triggers a response.
 

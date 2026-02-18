@@ -125,7 +125,7 @@ sudo journalctl -u agentforge.service -f
 | Component | Before | After |
 |-----------|--------|-------|
 | **Agent identity** | "You are Andy..." | "You are AgentForge..." |
-| **Trigger pattern** | `@Andy` | `@AgentForge` |
+| **Trigger pattern** | `@YourBot` | `@AgentForge` |
 | **Transcripts** | "Andy: Hello" | "AgentForge: Hello" |
 | **Code references** | Uses `ASSISTANT_NAME` | Uses `ASSISTANT_NAME` |
 
