@@ -47,3 +47,8 @@ agents-sdk-docs
 # Legacy branding assets (NanoClaw)
 assets/nanoclaw-*
 assets/social-preview.jpg
+
+# Blog/personal projects (not part of AgentForge)
+BLOG_*.md
+blog-drafts/
+pip-astro-blog/
