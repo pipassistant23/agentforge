@@ -102,60 +102,78 @@ Get AgentForge running in about five minutes.
 | 💬 Telegram bot token | From [@BotFather](https://t.me/BotFather) — free |
 | 🔑 AI Provider API access | Anthropic API key, Claude Code OAuth token, or OpenAI-compatible provider |
 
-### 1. Clone and install
+### 1. Clone and run setup
 
 ```bash
 git clone https://github.com/pipassistant23/agentforge.git
 cd agentforge
-npm install
-cd agent-runner-src && npm install && cd ..
+./setup.sh
 ```
+
+The setup script will:
+- Install all dependencies (orchestrator + agent-runner)
+- Build both TypeScript projects
+- Create required directories (`/data/qmd`, `store/`)
+- Set proper permissions
 
 ### 2. Configure your environment
 
 ```bash
-cp .env.example .env   # or create from scratch
+cp .env.example .env
+# Edit .env with your credentials
 ```
 
-Minimum required variables:
+**Minimum required variables:**
 
 ```ini
 # Telegram
 TELEGRAM_BOT_TOKEN=123456789:AABBccDDeeFFggHH...
 
 # Authentication — use ONE of these options:
+
 # Option 1: Anthropic API (pay-per-use)
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
 # Option 2: Claude Code OAuth (subscription)
-# CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
 
-# Option 3: Custom OpenAI-compatible provider
-# OPENAI_API_KEY=your-api-key
-# OPENAI_BASE_URL=https://your-provider.example.com/v1
-# OPENAI_MODEL=gpt-4  # or your model identifier
-
-# Optional: change the trigger name (default: Andy)
-# ASSISTANT_NAME=MyBot
-
-# Optional: additional bots for Agent Swarm support
-# TELEGRAM_BOT_POOL=token1,token2,token3
+# Option 3: Custom Anthropic-compatible provider
+ANTHROPIC_AUTH_TOKEN=your-api-key
+ANTHROPIC_BASE_URL=https://your-provider.example.com
+ANTHROPIC_MODEL=claude-sonnet-4-20250514  # or your model identifier
 ```
 
-### 3. Build
+**Optional settings:**
+
+```ini
+# Change the trigger name (default: Andy)
+ASSISTANT_NAME=MyBot
+
+# Additional bots for Agent Swarm support
+TELEGRAM_BOT_POOL=token1,token2,token3
+```
+
+### 3. Install as a systemd service
+
+Use the automated installer:
 
 ```bash
-npm run build
-cd agent-runner-src && npm run build && cd ..
+./install-service.sh
 ```
 
-### 4. Install as a systemd service
+The script will:
+- Auto-detect your Node.js path
+- Generate a service file with correct paths
+- Install to `/etc/systemd/system/agentforge.service`
+- Optionally enable and start the service
+
+**Or manually create the service:**
 
 ```bash
 sudo nano /etc/systemd/system/agentforge.service
 ```
 
-Paste the following, substituting your username and path:
+Paste the following, substituting your values:
 
 ```ini
 [Unit]
@@ -167,7 +185,8 @@ Type=simple
 User=your_username
 WorkingDirectory=/home/your_username/agentforge
 EnvironmentFile=/home/your_username/agentforge/.env
-ExecStart=/usr/bin/node dist/index.js
+Environment="PATH=/path/to/node/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/path/to/node dist/index.js
 Restart=on-failure
 RestartSec=10s
 StandardOutput=journal
@@ -177,6 +196,8 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
+**Important:** Replace `/path/to/node` with your actual Node.js path (`which node`). If using nvm, use the full path like `/home/user/.nvm/versions/node/v20.20.0/bin/node`.
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable agentforge.service
@@ -184,7 +205,7 @@ sudo systemctl start agentforge.service
 sudo systemctl status agentforge.service   # Should show: active (running)
 ```
 
-### 5. Register your first group
+### 4. Register your first group
 
 Send `/chatid` to your bot in Telegram. It replies with something like:
 
@@ -204,7 +225,9 @@ VALUES ('tg:-1001234567890', 'My Chat', 'main', '@YourAgent', datetime('now'), 0
 sudo systemctl restart agentforge.service
 ```
 
-### 6. Talk to your bot
+**⚠️ Important:** The chat ID must include the `tg:` prefix. This prefix identifies it as a Telegram chat.
+
+### 5. Talk to your bot
 
 Send any message to your registered chat. For the main group with `requires_trigger=0`, every message receives a response. For additional groups, prefix messages with the trigger word:
 

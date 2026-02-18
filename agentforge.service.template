@@ -1,0 +1,36 @@
+[Unit]
+Description=AgentForge - Personal Claude Assistant
+Documentation=https://github.com/pipassistant23/agentforge
+After=network.target
+
+[Service]
+Type=simple
+User={{USER}}
+WorkingDirectory={{WORKING_DIR}}
+EnvironmentFile={{WORKING_DIR}}/.env
+
+# Set PATH to include Node.js binary location
+# This is auto-detected during installation
+Environment="PATH={{NODE_BIN_DIR}}:/usr/local/bin:/usr/bin:/bin"
+
+# Start the orchestrator
+ExecStart={{NODE_PATH}} {{WORKING_DIR}}/dist/index.js
+
+# Restart on failure
+Restart=on-failure
+RestartSec=10s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentforge
+
+# Security hardening (optional - uncomment if desired)
+# ProtectSystem=strict
+# ProtectHome=read-only
+# ReadWritePaths={{WORKING_DIR}}/store {{WORKING_DIR}}/data {{WORKING_DIR}}/logs /data
+# NoNewPrivileges=true
+# PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
