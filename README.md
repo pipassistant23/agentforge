@@ -44,7 +44,7 @@
 
 AgentForge is a personal AI assistant that:
 - Runs Claude Agent SDK as baremetal Node.js processes (no containers)
-- Connects only to Telegram (WhatsApp removed for simplicity)
+- Connects only to Telegram
 - Isolates each chat group with dedicated workspaces
 - Supports Agent Swarms via bot pools (subagents get unique bot identities)
 - Runs as a systemd service on Linux
