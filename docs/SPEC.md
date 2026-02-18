@@ -359,7 +359,7 @@ Sessions enable conversation continuity - Claude remembers what you talked about
 
 Messages must start with the trigger pattern (default: `@YourBot`):
 - `@YourBot what's the weather?` → ✅ Triggers Claude
-- `@andy help me` → ✅ Triggers (case insensitive)
+- `@yourbot help me` → ✅ Triggers (case insensitive)
 - `Hey @YourBot` → ❌ Ignored (trigger not at start)
 - `What's up?` → ❌ Ignored (no trigger)
 

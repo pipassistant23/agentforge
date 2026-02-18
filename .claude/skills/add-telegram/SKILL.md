@@ -187,7 +187,7 @@ export class TelegramChannel implements Channel {
           : (ctx.chat as any).title || chatJid;
 
       // Translate Telegram @bot_username mentions into TRIGGER_PATTERN format.
-      // Telegram @mentions (e.g., @andy_ai_bot) won't match TRIGGER_PATTERN
+      // Telegram @mentions (e.g., @yourbot) won't match TRIGGER_PATTERN
       // (e.g., ^@YourBot\b), so we prepend the trigger when the bot is @mentioned.
       const botUsername = ctx.me?.username?.toLowerCase();
       if (botUsername) {
@@ -592,7 +592,7 @@ The bot responds when:
 2. Bot is @mentioned in Telegram (translated to TRIGGER_PATTERN automatically)
 3. Message matches TRIGGER_PATTERN directly (e.g., starts with @YourBot)
 
-Telegram @mentions (e.g., `@andy_ai_bot`) are automatically translated: if the bot is @mentioned and the message doesn't already match TRIGGER_PATTERN, the trigger prefix is prepended before storing. This ensures @mentioning the bot always triggers a response.
+Telegram @mentions (e.g., `@yourbot`) are automatically translated: if the bot is @mentioned and the message doesn't already match TRIGGER_PATTERN, the trigger prefix is prepended before storing. This ensures @mentioning the bot always triggers a response.
 
 **Group Privacy**: The bot must have Group Privacy disabled in BotFather to see non-mention messages in groups. See Prerequisites step 4.
 

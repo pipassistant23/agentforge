@@ -230,9 +230,9 @@ sqlite3 store/agentforge.db "SELECT * FROM router_state;"
    ```bash
    # Check configured trigger
    echo $TRIGGER_PATTERN
-   # Should be something like: ^@Andy\b
+   # Should be something like: ^@YourBot\b
 
-   # Messages must start with: @Andy (at-mention)
+   # Messages must start with: @YourBot (at-mention)
    # Or be in the main group (no trigger required)
    ```
 
