@@ -15,6 +15,29 @@
   # AgentForge
 
   Personal Claude assistant running on Linux via Telegram. Forked from [NanoClaw](https://github.com/gavrielc/nanoclaw) with simplified architecture: **Telegram-only, baremetal-only**.
+
+  ---
+
+  > **⚠️ SECURITY DISCLAIMER**
+  >
+  > **AgentForge is NOT a secure fork of NanoClaw.** This fork was intentionally modified to give the AI agent **full root access** to a dedicated Linux server. The original NanoClaw container isolation has been removed.
+  >
+  > **This is designed for a single-user deployment on a dedicated machine where you want to see what an AI agent can do with unrestricted system access.**
+  >
+  > **USE AT YOUR OWN RISK.** Only run this if you:
+  > - Have a dedicated server you're willing to let the agent control
+  > - Understand the security implications of giving an AI full system access
+  > - Are comfortable with the agent potentially modifying/deleting files, installing software, changing configurations, etc.
+  >
+  > **Do NOT run this on:**
+  > - A production server
+  > - A machine with sensitive data
+  > - A shared system
+  > - Your primary workstation
+  >
+  > If you want the secure, containerized version, use the original [NanoClaw](https://github.com/gavrielc/nanoclaw) instead.
+
+  ---
 </div>
 
 ## What is AgentForge?
