@@ -90,7 +90,7 @@ Get AgentForge running in about five minutes.
 | Node.js 20+ | Check with `node --version` |
 | [Claude Code CLI](https://claude.ai/download) | Installed and authenticated on the host |
 | Telegram bot token | From [@BotFather](https://t.me/BotFather) — free |
-| Anthropic API key **or** Claude Code OAuth token | One is required; not both |
+| AI Provider API access | Anthropic API key, Claude Code OAuth token, or OpenAI-compatible provider |
 
 ### 1. Clone and install
 
@@ -113,9 +113,17 @@ Minimum required variables:
 # Telegram
 TELEGRAM_BOT_TOKEN=123456789:AABBccDDeeFFggHH...
 
-# Authentication — use one of these two:
+# Authentication — use ONE of these options:
+# Option 1: Anthropic API (pay-per-use)
 ANTHROPIC_API_KEY=sk-ant-api03-...
+
+# Option 2: Claude Code OAuth (subscription)
 # CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+
+# Option 3: Custom OpenAI-compatible provider
+# OPENAI_API_KEY=your-api-key
+# OPENAI_BASE_URL=https://your-provider.example.com/v1
+# OPENAI_MODEL=gpt-4  # or your model identifier
 
 # Optional: change the trigger name (default: Andy)
 # ASSISTANT_NAME=MyBot
@@ -205,8 +213,11 @@ All configuration is environment variables loaded from `.env`. The full referenc
 | Variable | Default | Description |
 |---|---|---|
 | `TELEGRAM_BOT_TOKEN` | — | **Required.** Primary Telegram bot token |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key (pay-per-use). One of this or the OAuth token is required. |
+| `ANTHROPIC_API_KEY` | — | Anthropic API key (pay-per-use). One authentication method is required. |
 | `CLAUDE_CODE_OAUTH_TOKEN` | — | Claude subscription OAuth token (alternative to API key) |
+| `OPENAI_API_KEY` | — | OpenAI or compatible provider API key (alternative authentication) |
+| `OPENAI_BASE_URL` | — | Custom API endpoint for OpenAI-compatible providers |
+| `OPENAI_MODEL` | — | Model identifier for custom providers (provider-dependent) |
 | `ASSISTANT_NAME` | `Andy` | Trigger word — messages must start with `@Name` (case-insensitive) |
 | `TELEGRAM_BOT_POOL` | — | Comma-separated extra bot tokens for Agent Swarm personas |
 | `POLL_INTERVAL` | `2000` | Message poll interval in milliseconds |
@@ -223,6 +234,33 @@ ASSISTANT_NAME=Aria
 ```
 
 Messages now trigger on `@Aria ...` (case-insensitive). Restart the service after changing.
+
+### Using custom API providers
+
+AgentForge supports OpenAI-compatible API endpoints through the Claude Code CLI's provider configuration. This allows you to use alternative providers, self-hosted models, or proxy services.
+
+**Configure via environment variables in `.env`:**
+
+```ini
+# Custom OpenAI-compatible endpoint
+OPENAI_API_KEY=your-api-key-here
+OPENAI_BASE_URL=https://your-provider.example.com/v1
+
+# Model selection (optional, provider-dependent)
+OPENAI_MODEL=gpt-4
+```
+
+**Note:** When using a custom provider:
+- Remove or comment out `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN`
+- The provider must support the OpenAI Messages API format
+- Model availability and capabilities depend on your provider
+- Some Claude Code features may have limited support depending on the provider's API compatibility
+
+After changing providers, restart the service:
+
+```bash
+sudo systemctl restart agentforge.service
+```
 
 ### Registering additional groups
 
