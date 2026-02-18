@@ -181,7 +181,7 @@ Register that chat as the main group:
 ```bash
 sqlite3 store/messages.db "
 INSERT INTO registered_groups (jid, name, folder, trigger_pattern, added_at, requires_trigger)
-VALUES ('tg:-1001234567890', 'My Chat', 'main', '@YourBot', datetime('now'), 0);
+VALUES ('tg:-1001234567890', 'My Chat', 'main', 'your agent', datetime('now'), 0);
 "
 sudo systemctl restart agentforge.service
 ```
@@ -191,9 +191,9 @@ sudo systemctl restart agentforge.service
 Send any message to your registered chat. For the main group with `requires_trigger=0`, every message receives a response. For additional groups, prefix messages with the trigger word:
 
 ```
-@YourBot what's the weather like today?
-@YourBot help me write a bash script to monitor disk usage
-@YourBot summarize what we discussed this week
+your agent what's the weather like today?
+your agent help me write a bash script to monitor disk usage
+your agent summarize what we discussed this week
 ```
 
 ---
@@ -229,7 +229,7 @@ Messages now trigger on `@Aria ...` (case-insensitive). Restart the service afte
 From your main chat, ask the agent directly:
 
 ```
-@YourBot register this group: tg:-9876543210 as "Team Chat"
+your agent register this group: tg:-9876543210 as "Team Chat"
 ```
 
 Or insert directly into SQLite and restart. Set `requires_trigger=1` for group chats so the agent only responds when explicitly addressed.
@@ -241,9 +241,9 @@ Or insert directly into SQLite and restart. Set `requires_trigger=1` for group c
 ### Basic conversation
 
 ```
-@YourBot what are the top Hacker News stories today?
-@YourBot explain the difference between TCP and UDP
-@YourBot help me draft a reply to this email: [paste email]
+your agent what are the top Hacker News stories today?
+your agent explain the difference between TCP and UDP
+your agent help me draft a reply to this email: [paste email]
 ```
 
 ### File operations
@@ -251,9 +251,9 @@ Or insert directly into SQLite and restart. Set `requires_trigger=1` for group c
 Claude can read and write files in your group's workspace at `groups/{groupName}/`:
 
 ```
-@YourBot save these meeting notes to a file called meeting-2026-02-18.md
-@YourBot show me all files in my workspace
-@YourBot read back the notes from last week's meeting
+your agent save these meeting notes to a file called meeting-2026-02-18.md
+your agent show me all files in my workspace
+your agent read back the notes from last week's meeting
 ```
 
 ### Scheduled tasks
@@ -261,18 +261,18 @@ Claude can read and write files in your group's workspace at `groups/{groupName}
 Claude understands natural language scheduling. Tasks persist across restarts.
 
 ```
-@YourBot every weekday at 9am, check Hacker News and send me the top 5 AI stories
-@YourBot every Monday at 8am, remind me to review open pull requests
-@YourBot at 5pm today, send me a summary of what we discussed
+your agent every weekday at 9am, check Hacker News and send me the top 5 AI stories
+your agent every Monday at 8am, remind me to review open pull requests
+your agent at 5pm today, send me a summary of what we discussed
 ```
 
 Managing tasks:
 
 ```
-@YourBot list my scheduled tasks
-@YourBot pause task 3
-@YourBot cancel task 5
-@YourBot resume task 3
+your agent list my scheduled tasks
+your agent pause task 3
+your agent cancel task 5
+your agent resume task 3
 ```
 
 ### Agent Swarms
@@ -280,7 +280,7 @@ Managing tasks:
 When `TELEGRAM_BOT_POOL` is configured with additional bot tokens, Claude can spin up a named team of sub-agents. Each sub-agent gets its own Telegram bot identity:
 
 ```
-@YourBot assemble a team: a marine biologist, a physicist, and a science writer to collaborate on explaining bioluminescence to a general audience
+your agent assemble a team: a marine biologist, a physicist, and a science writer to collaborate on explaining bioluminescence to a general audience
 ```
 
 The group chat shows three distinct bots — "Marine Biologist," "Physicist," and "Science Writer" — posting independently and building on each other's contributions.
@@ -442,7 +442,7 @@ Check that `TELEGRAM_BOT_TOKEN` and one authentication variable are set in `.env
 ### Agent does not respond
 
 - Confirm the group is registered: `sqlite3 store/messages.db "SELECT jid, name FROM registered_groups;"`
-- Confirm your message starts with the trigger word: `@YourBot ...`
+- Confirm your message starts with the trigger word: `your agent ...`
 - Follow live logs: `sudo journalctl -u agentforge.service -f`
 
 ### Running old code after a change
