@@ -17,7 +17,6 @@
     "version": "node -e \"const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));console.log(p.version);\""
   },
   "dependencies": {
-    "@tobilu/qmd": "^0.9.0",
     "better-sqlite3": "^11.8.1",
     "cron-parser": "^5.5.0",
     "grammy": "^1.40.0",

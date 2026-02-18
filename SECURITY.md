@@ -22,7 +22,8 @@ We aim to respond to security reports within 48 hours.
 
 **Status:** No fix available
 **Severity:** High (not critical)
-**Impact:** Build-time dependency only
+**Location:** agent-runner-src/package.json only (not in orchestrator)
+**Impact:** Build-time dependency only, affects agent-runner module
 **CVSS:** Various tar vulnerabilities (file overwrite, symlink poisoning, path traversal)
 
 **Mitigations:**
@@ -31,6 +32,7 @@ We aim to respond to security reports within 48 hours.
 - The `tar` package is not used in production code
 - Risk is limited to development/build environments
 - AgentForge does not extract untrusted tar archives
+- Main orchestrator does not include this dependency (isolated to agent-runner)
 
 **Tracking:**
 - Upstream fix required in `@tobilu/qmd` package
