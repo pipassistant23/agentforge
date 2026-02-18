@@ -102,6 +102,45 @@ function setupGroupSession(group: RegisteredGroup): string {
     }
   }
 
+  // Sync shared template files from groups/global/ to group workspace
+  // AGENTS.md is NOT synced - it's group-specific
+  const groupWorkspace = path.join(GROUPS_DIR, group.folder);
+  const globalWorkspace = path.join(GROUPS_DIR, 'global');
+  const sharedTemplateFiles = ['SOUL.md', 'TOOLS.md'];
+
+  for (const templateFile of sharedTemplateFiles) {
+    const srcFile = path.join(globalWorkspace, templateFile);
+    const dstFile = path.join(groupWorkspace, templateFile);
+    if (fs.existsSync(srcFile)) {
+      fs.copyFileSync(srcFile, dstFile);
+    }
+  }
+
+  // Ensure group-specific template files exist
+  const groupTemplateFiles = [
+    { name: 'AGENTS.md', defaultContent: '# Agent Instructions\n\nGroup-specific instructions for the agent.\n\nSee groups/main/AGENTS.md for a template.\n' },
+    { name: 'USER.md', defaultContent: '# User Profile\n\nAdd user preferences and context here.\n' },
+    { name: 'memory.md', defaultContent: '# Long-term Memory\n\nImportant facts and patterns.\n' },
+  ];
+
+  for (const { name, defaultContent } of groupTemplateFiles) {
+    const filePath = path.join(groupWorkspace, name);
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, defaultContent, 'utf-8');
+    }
+  }
+
+  // Initialize memory directory and today's log
+  const memoryDir = path.join(groupWorkspace, 'memory');
+  fs.mkdirSync(memoryDir, { recursive: true });
+
+  const today = new Date().toISOString().split('T')[0];
+  const todayLogPath = path.join(memoryDir, `${today}.md`);
+  if (!fs.existsSync(todayLogPath)) {
+    const todayTemplate = `# ${today}\n\n## Summary\n\n(Daily summary - updated throughout the day)\n\n## Conversations\n\n`;
+    fs.writeFileSync(todayLogPath, todayTemplate, 'utf-8');
+  }
+
   return groupSessionsDir;
 }
 

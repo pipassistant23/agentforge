@@ -9,7 +9,7 @@ store/
 data/
 logs/
 
-# Groups - only track base structure and specific CLAUDE.md files
+# Groups - only track base structure and template files
 groups/*
 !groups/main/
 !groups/global/
@@ -17,6 +17,16 @@ groups/main/*
 groups/global/*
 !groups/main/CLAUDE.md
 !groups/global/CLAUDE.md
+!groups/main/AGENTS.md
+!groups/global/AGENTS.md
+!groups/main/SOUL.md
+!groups/global/SOUL.md
+!groups/main/TOOLS.md
+!groups/global/TOOLS.md
+!groups/main/USER.md
+!groups/main/memory.md
+!groups/main/memory/
+!groups/main/memory/.gitkeep
 
 # Secrets
 *.keys.json

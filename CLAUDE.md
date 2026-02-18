@@ -2,6 +2,20 @@
 
 Personal Claude assistant running on Linux. Forked from NanoClaw with baremetal execution and multi-channel support.
 
+## Template System
+
+AgentForge uses **AGENTS.md** as the primary instruction file for agents (not CLAUDE.md). This follows the emerging standard used by other AI coding tools.
+
+**File structure:**
+- `groups/{name}/AGENTS.md` - Main instruction file (capabilities, guidelines)
+- `groups/{name}/SOUL.md` - Identity and behavioral boundaries
+- `groups/{name}/TOOLS.md` - Environment and tool reference
+- `groups/{name}/USER.md` - User preferences
+- `groups/{name}/memory.md` - Long-term memory
+- `groups/{name}/memory/YYYY-MM-DD.md` - Daily logs
+
+See `docs/TEMPLATE_SYSTEM.md` for details.
+
 ## Quick Context
 
 Single Node.js process that connects to Telegram, routes messages to Claude Agent SDK running as baremetal processes. Each group has isolated filesystem and memory.
@@ -18,8 +32,8 @@ Single Node.js process that connects to Telegram, routes messages to Claude Agen
 | `src/config.ts` | Trigger pattern, paths, intervals |
 | `src/task-scheduler.ts` | Runs scheduled tasks |
 | `src/db.ts` | SQLite operations |
-| `groups/{name}/CLAUDE.md` | Per-group memory (isolated) |
-| `groups/global/CLAUDE.md` | Agent Teams instructions and global settings |
+| `groups/{name}/AGENTS.md` | Per-group instructions (isolated) |
+| `groups/global/AGENTS.md` | Agent Teams instructions and global settings |
 | `agent-runner-src/dist/index.js` | Baremetal agent entry point (source in agent-runner-src/) |
 
 ## Features
@@ -62,7 +76,7 @@ Environment variables loaded from `/home/dustin/agentforge/.env` via Environment
 Agents spawn as baremetal Node.js processes via `node agent-runner-src/dist/index.js`:
 - Isolated `/data/groups/{groupFolder}/` directories
 - File-based IPC in `/data/ipc/{groupFolder}/`
-- Per-group CLAUDE.md memory
+- Per-group AGENTS.md instructions and memory system
 - Environment-based workspace paths
 - Fast startup (~100-200ms)
 - Source code in `agent-runner-src/`, compiled to `agent-runner-src/dist/`

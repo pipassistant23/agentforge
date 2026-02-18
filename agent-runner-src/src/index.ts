@@ -405,30 +405,30 @@ async function runQuery(
   let memoryFlushTriggered = false;
   const MEMORY_FLUSH_MESSAGE_THRESHOLD = 40; // Trigger after 40 messages
 
-  // Load and process CLAUDE.md files with template variable substitution
-  // Global CLAUDE.md (shared across all groups)
-  const globalClaudeMdPath = path.join(WORKSPACE_GLOBAL, 'CLAUDE.md');
-  let globalClaudeMd: string | undefined;
-  if (!containerInput.isMain && fs.existsSync(globalClaudeMdPath)) {
-    const rawContent = fs.readFileSync(globalClaudeMdPath, 'utf-8');
-    globalClaudeMd = substituteVariables(rawContent);
+  // Load and process AGENTS.md files with template variable substitution
+  // Global AGENTS.md (shared across all groups)
+  const globalAgentsMdPath = path.join(WORKSPACE_GLOBAL, 'AGENTS.md');
+  let globalAgentsMd: string | undefined;
+  if (!containerInput.isMain && fs.existsSync(globalAgentsMdPath)) {
+    const rawContent = fs.readFileSync(globalAgentsMdPath, 'utf-8');
+    globalAgentsMd = substituteVariables(rawContent);
   }
 
-  // Group CLAUDE.md (specific to this group)
-  const groupClaudeMdPath = path.join(WORKSPACE_GROUP, 'CLAUDE.md');
-  let groupClaudeMd: string | undefined;
-  if (fs.existsSync(groupClaudeMdPath)) {
-    const rawContent = fs.readFileSync(groupClaudeMdPath, 'utf-8');
-    groupClaudeMd = substituteVariables(rawContent);
+  // Group AGENTS.md (specific to this group)
+  const groupAgentsMdPath = path.join(WORKSPACE_GROUP, 'AGENTS.md');
+  let groupAgentsMd: string | undefined;
+  if (fs.existsSync(groupAgentsMdPath)) {
+    const rawContent = fs.readFileSync(groupAgentsMdPath, 'utf-8');
+    groupAgentsMd = substituteVariables(rawContent);
   }
 
-  // Combine global and group CLAUDE.md into systemPrompt
-  const combinedClaudeMd = [globalClaudeMd, groupClaudeMd]
+  // Combine global and group AGENTS.md into systemPrompt
+  const combinedAgentsMd = [globalAgentsMd, groupAgentsMd]
     .filter(Boolean)
     .join('\n\n---\n\n');
 
   // Discover additional directories mounted at extra workspace
-  // These are passed to the SDK so their CLAUDE.md files are loaded automatically
+  // These are passed to the SDK for additional context
   const extraDirs: string[] = [];
   if (fs.existsSync(WORKSPACE_EXTRA)) {
     for (const entry of fs.readdirSync(WORKSPACE_EXTRA)) {
@@ -449,8 +449,8 @@ async function runQuery(
       additionalDirectories: extraDirs.length > 0 ? extraDirs : undefined,
       resume: sessionId,
       resumeSessionAt: resumeAt,
-      systemPrompt: combinedClaudeMd
-        ? { type: 'preset' as const, preset: 'claude_code' as const, append: combinedClaudeMd }
+      systemPrompt: combinedAgentsMd
+        ? { type: 'preset' as const, preset: 'claude_code' as const, append: combinedAgentsMd }
         : undefined,
       allowedTools: [
         'Bash',
@@ -506,8 +506,8 @@ Please save any important information from our conversation so far:
 2. APPEND to /workspace/group/memory/${todayDate}.md
    - IMPORTANT: If the file exists, READ it first and append new content
    - Do NOT overwrite existing entries
-3. Update /workspace/group/CLAUDE.md only if critical facts emerge
-   - Keep CLAUDE.md concise (~500 tokens max)
+3. Update /workspace/group/AGENTS.md only if critical facts emerge
+   - Keep AGENTS.md concise (~500 tokens max)
    - Move detail to memory/ topic files
 
 After saving, reply with "Memory updated" or continue our conversation naturally.`);

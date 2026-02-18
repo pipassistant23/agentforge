@@ -1,0 +1,11 @@
+# Daily memory logs
+
+This directory contains daily log files in the format YYYY-MM-DD.md.
+
+These logs are created automatically and capture:
+- Conversations and interactions
+- Decisions made during the day
+- Important context discovered
+- Tasks completed or scheduled
+
+The agent reads today's log + yesterday's log at the start of each session.
