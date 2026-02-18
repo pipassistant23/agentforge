@@ -118,9 +118,20 @@ function setupGroupSession(group: RegisteredGroup): string {
 
   // Ensure group-specific template files exist
   const groupTemplateFiles = [
-    { name: 'AGENTS.md', defaultContent: '# Agent Instructions\n\nGroup-specific instructions for the agent.\n\nSee groups/main/AGENTS.md for a template.\n' },
-    { name: 'USER.md', defaultContent: '# User Profile\n\nAdd user preferences and context here.\n' },
-    { name: 'memory.md', defaultContent: '# Long-term Memory\n\nImportant facts and patterns.\n' },
+    {
+      name: 'AGENTS.md',
+      defaultContent:
+        '# Agent Instructions\n\nGroup-specific instructions for the agent.\n\nSee groups/main/AGENTS.md for a template.\n',
+    },
+    {
+      name: 'USER.md',
+      defaultContent:
+        '# User Profile\n\nAdd user preferences and context here.\n',
+    },
+    {
+      name: 'memory.md',
+      defaultContent: '# Long-term Memory\n\nImportant facts and patterns.\n',
+    },
   ];
 
   for (const { name, defaultContent } of groupTemplateFiles) {
