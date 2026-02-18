@@ -61,4 +61,8 @@ export type OnInboundMessage = (chatJid: string, message: NewMessage) => void;
 
 // Callback for chat metadata discovery.
 // name is optional — Telegram delivers names inline and passes them here.
-export type OnChatMetadata = (chatJid: string, timestamp: string, name?: string) => void;
+export type OnChatMetadata = (
+  chatJid: string,
+  timestamp: string,
+  name?: string,
+) => void;

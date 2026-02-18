@@ -81,7 +81,11 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   (targetGroup && targetGroup.folder === sourceGroup)
                 ) {
                   // Route through bot pool if sender is specified and it's a Telegram chat
-                  if (data.sender && data.chatJid.startsWith('tg:') && TELEGRAM_BOT_POOL.length > 0) {
+                  if (
+                    data.sender &&
+                    data.chatJid.startsWith('tg:') &&
+                    TELEGRAM_BOT_POOL.length > 0
+                  ) {
                     await sendPoolMessage(
                       data.chatJid,
                       data.text,
@@ -387,12 +391,10 @@ export async function processTaskIpc(
         break;
       }
 
-      // Validate JID format
-      if (!data.jid.match(/^(tg|wa):-?\d+$/)) {
-        logger.error(
-          { jid: data.jid, sourceGroup },
-          'Invalid JID format - must be tg:ID or wa:ID',
-        );
+      // Validate JID format (Telegram: tg:-12345, WhatsApp: phone@s.whatsapp.net or groupid@g.us)
+      const jidRegex = /^(tg:-?\d+|[\w.+-]+@[\w.+-]+)$/;
+      if (!jidRegex.test(data.jid)) {
+        logger.error({ jid: data.jid, sourceGroup }, 'Invalid JID format');
         break;
       }
 

@@ -66,16 +66,23 @@ function setupGroupSession(group: RegisteredGroup): string {
 
   const settingsFile = path.join(groupSessionsDir, 'settings.json');
   if (!fs.existsSync(settingsFile)) {
-    fs.writeFileSync(settingsFile, JSON.stringify({
-      env: {
-        // Enable agent swarms (subagent orchestration)
-        CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-        // Load CLAUDE.md from additional mounted directories
-        CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-        // Enable Claude's memory feature
-        CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
-      },
-    }, null, 2) + '\n');
+    fs.writeFileSync(
+      settingsFile,
+      JSON.stringify(
+        {
+          env: {
+            // Enable agent swarms (subagent orchestration)
+            CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
+            // Load CLAUDE.md from additional mounted directories
+            CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
+            // Enable Claude's memory feature
+            CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
+          },
+        },
+        null,
+        2,
+      ) + '\n',
+    );
   }
 
   // Sync skills from skills/ into each group's .claude/skills/
@@ -125,24 +132,28 @@ export async function runContainerAgent(
 
   return new Promise((resolve) => {
     // Spawn agent as baremetal Node.js process
-    const agentProcess = spawn('node', [path.join(process.cwd(), 'agent/agent-runner/dist/index.js')], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      cwd: path.join(GROUPS_DIR, group.folder),
-      env: {
-        // SECURITY: Only pass necessary env vars, exclude sensitive tokens
-        PATH: process.env.PATH,
-        HOME: process.env.HOME,
-        NODE_ENV: process.env.NODE_ENV,
-        LOG_LEVEL: process.env.LOG_LEVEL,
-        AGENTFORGE_CHAT_JID: input.chatJid,
-        AGENTFORGE_GROUP_FOLDER: input.groupFolder,
-        AGENTFORGE_IS_MAIN: input.isMain ? '1' : '0',
-        // Point to actual host paths (baremetal, no container mounts)
-        WORKSPACE_IPC: groupIpcDir,
-        WORKSPACE_GROUP: path.join(GROUPS_DIR, group.folder),
-        WORKSPACE_GLOBAL: path.join(GROUPS_DIR, 'global'),
+    const agentProcess = spawn(
+      'node',
+      [path.join(process.cwd(), 'agent/agent-runner/dist/index.js')],
+      {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: path.join(GROUPS_DIR, group.folder),
+        env: {
+          // SECURITY: Only pass necessary env vars, exclude sensitive tokens
+          PATH: process.env.PATH,
+          HOME: process.env.HOME,
+          NODE_ENV: process.env.NODE_ENV,
+          LOG_LEVEL: process.env.LOG_LEVEL,
+          AGENTFORGE_CHAT_JID: input.chatJid,
+          AGENTFORGE_GROUP_FOLDER: input.groupFolder,
+          AGENTFORGE_IS_MAIN: input.isMain ? '1' : '0',
+          // Point to actual host paths (baremetal, no container mounts)
+          WORKSPACE_IPC: groupIpcDir,
+          WORKSPACE_GROUP: path.join(GROUPS_DIR, group.folder),
+          WORKSPACE_GLOBAL: path.join(GROUPS_DIR, 'global'),
+        },
       },
-    });
+    );
 
     onProcess(agentProcess, processName);
 
@@ -169,7 +180,10 @@ export async function runContainerAgent(
 
     // SECURITY: Check if stdin is available before writing
     if (!agentProcess.stdin) {
-      logger.error({ group: group.name, processName }, 'Agent process stdin not available');
+      logger.error(
+        { group: group.name, processName },
+        'Agent process stdin not available',
+      );
       agentProcess.kill();
       resolve({
         status: 'error',
@@ -183,7 +197,10 @@ export async function runContainerAgent(
       agentProcess.stdin.write(JSON.stringify(input));
       agentProcess.stdin.end();
     } catch (err) {
-      logger.error({ group: group.name, error: err }, 'Failed to write to agent stdin');
+      logger.error(
+        { group: group.name, error: err },
+        'Failed to write to agent stdin',
+      );
       agentProcess.kill();
       resolve({
         status: 'error',
@@ -289,11 +306,17 @@ export async function runContainerAgent(
       process.env.TIMEOUT_GRACE_PERIOD || '30000',
       10,
     ); // Default: 30 seconds
-    const timeoutMs = Math.max(configTimeout, IDLE_TIMEOUT + TIMEOUT_GRACE_PERIOD);
+    const timeoutMs = Math.max(
+      configTimeout,
+      IDLE_TIMEOUT + TIMEOUT_GRACE_PERIOD,
+    );
 
     const killOnTimeout = () => {
       timedOut = true;
-      logger.error({ group: group.name, processName }, 'Agent timeout, killing process');
+      logger.error(
+        { group: group.name, processName },
+        'Agent timeout, killing process',
+      );
       agentProcess.kill('SIGKILL');
     };
 
@@ -312,15 +335,18 @@ export async function runContainerAgent(
       if (timedOut) {
         const ts = new Date().toISOString().replace(/[:.]/g, '-');
         const timeoutLog = path.join(logsDir, `agent-${ts}.log`);
-        fs.writeFileSync(timeoutLog, [
-          `=== Agent Run Log (TIMEOUT) ===`,
-          `Timestamp: ${new Date().toISOString()}`,
-          `Group: ${group.name}`,
-          `Process: ${processName}`,
-          `Duration: ${duration}ms`,
-          `Exit Code: ${code}`,
-          `Had Streaming Output: ${hadStreamingOutput}`,
-        ].join('\n'));
+        fs.writeFileSync(
+          timeoutLog,
+          [
+            `=== Agent Run Log (TIMEOUT) ===`,
+            `Timestamp: ${new Date().toISOString()}`,
+            `Group: ${group.name}`,
+            `Process: ${processName}`,
+            `Duration: ${duration}ms`,
+            `Exit Code: ${code}`,
+            `Had Streaming Output: ${hadStreamingOutput}`,
+          ].join('\n'),
+        );
 
         // Timeout after output = idle cleanup, not failure
         if (hadStreamingOutput) {
@@ -337,7 +363,10 @@ export async function runContainerAgent(
               });
             })
             .catch((err) => {
-              logger.error({ group: group.name, error: err }, 'Error in final output chain');
+              logger.error(
+                { group: group.name, error: err },
+                'Error in final output chain',
+              );
               resolve({
                 status: 'error',
                 result: null,
@@ -363,7 +392,8 @@ export async function runContainerAgent(
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const logFile = path.join(logsDir, `agent-${timestamp}.log`);
-      const isVerbose = process.env.LOG_LEVEL === 'debug' || process.env.LOG_LEVEL === 'trace';
+      const isVerbose =
+        process.env.LOG_LEVEL === 'debug' || process.env.LOG_LEVEL === 'trace';
 
       const logLines = [
         `=== Agent Run Log ===`,
@@ -380,11 +410,7 @@ export async function runContainerAgent(
       const isError = code !== 0;
 
       if (isVerbose || isError) {
-        logLines.push(
-          `=== Input ===`,
-          JSON.stringify(input, null, 2),
-          ``,
-        );
+        logLines.push(`=== Input ===`, JSON.stringify(input, null, 2), ``);
       }
 
       if (isVerbose || isError) {
@@ -416,7 +442,10 @@ export async function runContainerAgent(
             });
           })
           .catch((err) => {
-            logger.error({ group: group.name, error: err }, 'Error in final output chain');
+            logger.error(
+              { group: group.name, error: err },
+              'Error in final output chain',
+            );
             resolve({
               status: 'error',
               result: null,
@@ -427,7 +456,10 @@ export async function runContainerAgent(
         return;
       }
 
-      logger.info({ group: group.name, code, duration }, 'Agent process completed');
+      logger.info(
+        { group: group.name, code, duration },
+        'Agent process completed',
+      );
 
       // Wait for output chain to finish
       outputChain
@@ -439,7 +471,10 @@ export async function runContainerAgent(
           });
         })
         .catch((err) => {
-          logger.error({ group: group.name, error: err }, 'Error in final output chain');
+          logger.error(
+            { group: group.name, error: err },
+            'Error in final output chain',
+          );
           resolve({
             status: 'error',
             result: null,

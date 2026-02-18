@@ -10,7 +10,11 @@ import {
   SCHEDULER_POLL_INTERVAL,
   TIMEZONE,
 } from './config.js';
-import { AgentOutput, runContainerAgent, writeTasksSnapshot } from './bare-metal-runner.js';
+import {
+  AgentOutput,
+  runContainerAgent,
+  writeTasksSnapshot,
+} from './bare-metal-runner.js';
 import {
   getAllTasks,
   getDueTasks,
@@ -26,7 +30,12 @@ export interface SchedulerDependencies {
   registeredGroups: () => Record<string, RegisteredGroup>;
   getSessions: () => Record<string, string>;
   queue: GroupQueue;
-  onProcess: (groupJid: string, proc: ChildProcess, processName: string, groupFolder: string) => void;
+  onProcess: (
+    groupJid: string,
+    proc: ChildProcess,
+    processName: string,
+    groupFolder: string,
+  ) => void;
   sendMessage: (jid: string, text: string) => Promise<void>;
 }
 
@@ -96,7 +105,10 @@ async function runTask(
   const resetIdleTimer = () => {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      logger.debug({ taskId: task.id }, 'Scheduled task idle timeout, closing process stdin');
+      logger.debug(
+        { taskId: task.id },
+        'Scheduled task idle timeout, closing process stdin',
+      );
       deps.queue.closeStdin(task.chat_jid);
     }, IDLE_TIMEOUT);
   };
@@ -112,7 +124,8 @@ async function runTask(
         isMain,
         isScheduledTask: true,
       },
-      (proc, processName) => deps.onProcess(task.chat_jid, proc, processName, task.group_folder),
+      (proc, processName) =>
+        deps.onProcess(task.chat_jid, proc, processName, task.group_folder),
       async (streamedOutput: AgentOutput) => {
         if (streamedOutput.result) {
           result = streamedOutput.result;
@@ -201,10 +214,8 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
           continue;
         }
 
-        deps.queue.enqueueTask(
-          currentTask.chat_jid,
-          currentTask.id,
-          () => runTask(currentTask, deps),
+        deps.queue.enqueueTask(currentTask.chat_jid, currentTask.id, () =>
+          runTask(currentTask, deps),
         );
       }
     } catch (err) {

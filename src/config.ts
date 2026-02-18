@@ -11,10 +11,7 @@ export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
 
 // Poll intervals (milliseconds)
-export const POLL_INTERVAL = parseInt(
-  process.env.POLL_INTERVAL || '2000',
-  10,
-); // Main message poll interval
+export const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || '2000', 10); // Main message poll interval
 export const SCHEDULER_POLL_INTERVAL = parseInt(
   process.env.SCHEDULER_POLL_INTERVAL || '60000',
   10,
@@ -48,10 +45,7 @@ export const AGENT_MAX_OUTPUT_SIZE = parseInt(
   process.env.AGENT_MAX_OUTPUT_SIZE || '10485760',
   10,
 ); // 10MB default
-export const IDLE_TIMEOUT = parseInt(
-  process.env.IDLE_TIMEOUT || '1800000',
-  10,
-); // 30min default — how long to keep agent process alive after last result
+export const IDLE_TIMEOUT = parseInt(process.env.IDLE_TIMEOUT || '1800000', 10); // 30min default — how long to keep agent process alive after last result
 export const MAX_CONCURRENT_PROCESSES = Math.max(
   1,
   parseInt(process.env.MAX_CONCURRENT_PROCESSES || '5', 10) || 5,
