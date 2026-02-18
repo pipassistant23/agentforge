@@ -250,4 +250,4 @@ MIT (inherited from NanoClaw)
 
 **Inspired by:**
 - [OpenClaw](https://github.com/openclaw/openclaw) - Memory structure and organization patterns
-- [Ray Fernando](https://github.com/RayFernando1337) - Agent orchestration ideas from [this video](https://youtu.be/AuofNgImNhk)
+- [Ray Fernando](https://github.com/RayFernando1337) - Dream cycle and memory consolidation system from [this video](https://youtu.be/AuofNgImNhk)
