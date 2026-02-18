@@ -130,18 +130,18 @@ ls -lh dist/index.js               # Check build time
 
 ## Usage
 
-Talk to your bot in Telegram using the trigger word (default: `@YourBot`):
+Talk to your bot in Telegram using the trigger word (default: `@YourAgent`):
 
 ```
-@YourBot what's the weather?
-@YourBot summarize this article: https://...
-@YourBot schedule a reminder for tomorrow at 9am
+@YourAgent what's the weather?
+@YourAgent summarize this article: https://...
+@YourAgent schedule a reminder for tomorrow at 9am
 ```
 
 From your main chat (1:1 with the bot), you can manage groups and tasks:
 ```
-@YourBot list all scheduled tasks
-@YourBot pause the morning briefing task
+@YourAgent list all scheduled tasks
+@YourAgent pause the morning briefing task
 ```
 
 ## Scheduled Tasks
@@ -149,8 +149,8 @@ From your main chat (1:1 with the bot), you can manage groups and tasks:
 Create recurring tasks that run Claude and message you back:
 
 ```
-@YourBot every weekday at 9am, check my calendar and send me a summary
-@YourBot every Monday at 8am, compile AI news from Hacker News and message me
+@YourAgent every weekday at 9am, check my calendar and send me a summary
+@YourAgent every Monday at 8am, compile AI news from Hacker News and message me
 ```
 
 ## Agent Swarms
@@ -162,7 +162,7 @@ If you configure `TELEGRAM_BOT_POOL` in your `.env`, AgentForge supports Agent T
 
 Example:
 ```
-You: @YourBot I need help researching ocean life and physics
+You: @YourAgent I need help researching ocean life and physics
 
 Your bot spawns:
 - Subagent "Marine Biologist" → assigned bot token #1 → renamed to "Marine Biologist"
