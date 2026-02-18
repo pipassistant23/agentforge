@@ -14,14 +14,14 @@
 
   # AgentForge
 
-  Personal Claude assistant running on Linux via Telegram. Forked from [NanoClaw](https://github.com/gavrielc/nanoclaw) with simplified architecture: **Telegram-only, baremetal-only**.
+  Personal Claude assistant running on Linux via Telegram. Forked from [NanoClaw](https://github.com/gavrielc/nanoclaw) with simplified architecture.
 
   <br/>
 
   | ⚠️ Security Model | AgentForge | [NanoClaw](https://github.com/gavrielc/nanoclaw) |
   |-------------------|------------|------------|
   | Container isolation | ❌ Removed | ✅ Yes |
-  | Use case | Dedicated experimental server | Production-ready |
+  | Use case | Dedicated experimental server | Secure |
   | AI system access | Full root access | Sandboxed |
 </div>
 
@@ -245,4 +245,9 @@ MIT (inherited from NanoClaw)
 
 ## Credits
 
-Forked from [NanoClaw](https://github.com/gavrielc/nanoclaw) by [@gavrielc](https://github.com/gavrielc)
+**Based on:**
+- [NanoClaw](https://github.com/gavrielc/nanoclaw) by [@gavrielc](https://github.com/gavrielc) - Core architecture and Agent SDK integration
+
+**Inspired by:**
+- [OpenClaw](https://github.com/openclaw/openclaw) - Memory structure and organization patterns
+- [Ray Fernando](https://github.com/RayFernando1337) - Agent orchestration ideas from [this video](https://youtu.be/AuofNgImNhk)
