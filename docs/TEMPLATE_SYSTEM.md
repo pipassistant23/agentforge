@@ -8,35 +8,46 @@ AgentForge now uses **AGENTS.md** as the primary instruction file, following sta
 
 ## Overview
 
-The template system provides a multi-layered approach to agent context and memory:
+The template system provides a multi-layered approach to agent context and memory, following [OpenClaw conventions](https://docs.openclaw.ai/reference/templates):
 
 | File | Purpose | Scope | Loaded At |
 |------|---------|-------|-----------|
+| `BOOTSTRAP.md` | Initial setup guide (delete after first run) | Global → Group | First session only |
+| `IDENTITY.md` | Name, nature, vibe, emoji, avatar | Global → Group | Session start |
+| `SOUL.md` | Core truths, boundaries, personality | Global → Group | Session start |
 | `AGENTS.md` | Operational guidelines & safety defaults | Global or Group | Session start |
-| `SOUL.md` | Identity, tone, behavioral boundaries | Global or Group | Session start |
-| `TOOLS.md` | Environment & tools reference | Global or Group | Session start |
+| `TOOLS.md` | Environment & tools reference | Global → Group | Session start |
 | `USER.md` | User preferences & context | Per-group | Session start |
 | `memory.md` | Long-term facts & patterns | Per-group | Session start |
 | `memory/YYYY-MM-DD.md` | Daily conversation logs | Per-group | Session start (today + yesterday) |
+| `HEARTBEAT.md` | Periodic task definitions | Global → Group | Background checks |
+| `memory/heartbeat-state.json` | Heartbeat execution tracking | Per-group | Automatic |
 
 ## File Hierarchy
 
 ```
 groups/
 ├── global/
+│   ├── BOOTSTRAP.md       # Initial setup template (synced to new groups)
+│   ├── IDENTITY.md        # Shared identity template
+│   ├── SOUL.md            # Shared behavioral template
 │   ├── AGENTS.md          # Global operational guidelines (non-main groups)
-│   ├── SOUL.md            # Shared identity template
-│   └── TOOLS.md           # Shared tool reference template
+│   ├── TOOLS.md           # Shared tool reference template
+│   └── HEARTBEAT.md       # Shared heartbeat task template
 │
 └── main/  (or any group)
-    ├── AGENTS.md          # Group-specific operational guidelines (primary instruction file)
+    ├── BOOTSTRAP.md       # (Synced from global/, delete after setup)
+    ├── IDENTITY.md        # (Synced from global/ on each agent startup)
     ├── SOUL.md            # (Synced from global/ on each agent startup)
+    ├── AGENTS.md          # Group-specific operational guidelines (primary instruction file)
     ├── TOOLS.md           # (Synced from global/ on each agent startup)
+    ├── HEARTBEAT.md       # (Synced from global/ on each agent startup)
     ├── USER.md            # User preferences for this group
     ├── memory.md          # Long-term facts for this group
     └── memory/
         ├── 2026-02-18.md  # Today's log
         ├── 2026-02-17.md  # Yesterday's log
+        ├── heartbeat-state.json  # Heartbeat tracking
         └── ...
 ```
 
@@ -46,13 +57,15 @@ groups/
 
 When an agent starts, it should read (in order):
 
-1. `AGENTS.md` - Learn operational guidelines and safety defaults
-2. `SOUL.md` - Understand identity and behavioral boundaries
-3. `TOOLS.md` - Review available tools and environment
-4. `USER.md` - Load user preferences and context
-5. `memory.md` - Read long-term facts and patterns
-6. `memory/YYYY-MM-DD.md` - Read today's log (if exists)
-7. `memory/YYYY-MM-DD.md` - Read yesterday's log (if exists)
+1. `BOOTSTRAP.md` - First-time setup guidance (if this is a new agent)
+2. `IDENTITY.md` - Learn who you are (name, nature, vibe)
+3. `SOUL.md` - Understand core truths and boundaries
+4. `AGENTS.md` - Learn operational guidelines and safety defaults
+5. `TOOLS.md` - Review available tools and environment
+6. `USER.md` - Load user preferences and context
+7. `memory.md` - Read long-term facts and patterns
+8. `memory/YYYY-MM-DD.md` - Read today's log (if exists)
+9. `memory/YYYY-MM-DD.md` - Read yesterday's log (if exists)
 
 This is documented in the "Session Startup" section of `AGENTS.md`.
 
@@ -65,10 +78,11 @@ This is documented in the "Session Startup" section of `AGENTS.md`.
 ### Automatic Management
 
 The `setupGroupSession()` function in `bare-metal-runner.ts`:
-- Syncs `SOUL.md` and `TOOLS.md` from `groups/global/` to each group on every agent startup
+- Syncs `BOOTSTRAP.md`, `IDENTITY.md`, `SOUL.md`, `TOOLS.md`, and `HEARTBEAT.md` from `groups/global/` to each group on every agent startup
 - Does **not** sync `AGENTS.md` — it is group-specific and managed per group
 - Ensures `AGENTS.md`, `USER.md`, and `memory.md` exist in each group workspace (creates with defaults if missing)
 - Initializes today's memory log if it doesn't exist
+- Creates `memory/heartbeat-state.json` for tracking periodic tasks
 
 ## Memory System
 

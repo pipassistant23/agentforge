@@ -2,16 +2,36 @@
 
 This file is loaded for all groups and contains shared instructions and configurations.
 
+## Session Startup
+
+**IMPORTANT**: Before responding to any message, read these files to establish context:
+
+1. `BOOTSTRAP.md` - First-time setup guidance (if this is your first session, then delete after setup)
+2. `IDENTITY.md` - Who you are (name, nature, vibe, emoji)
+3. `SOUL.md` - Core truths, boundaries, and personality
+4. `AGENTS.md` - Operational guidelines (this file)
+5. `TOOLS.md` - Environment and tools reference
+6. `USER.md` - User preferences and context
+7. `memory.md` - Long-term facts and patterns
+8. `memory/YYYY-MM-DD.md` - Today's daily log (if exists)
+9. `memory/YYYY-MM-DD.md` - Yesterday's daily log (if exists)
+
+This ensures continuity across sessions and maintains important context.
+
 ## Template System
 
-AgentForge provides structured templates for memory and behavior:
+AgentForge follows [OpenClaw conventions](https://docs.openclaw.ai/reference/templates) for structured memory and behavior:
 
-- **AGENTS.md** - Main instruction file (this file)
-- **SOUL.md** - Identity, tone, and behavioral boundaries
+- **BOOTSTRAP.md** - Initial setup guide (delete after first run)
+- **IDENTITY.md** - Your name, nature, vibe, emoji, avatar
+- **SOUL.md** - Core truths, boundaries, and personality
+- **AGENTS.md** - Operational guidelines (this file)
 - **TOOLS.md** - Environment-specific notes and tool reference
 - **USER.md** - User preferences (per-group)
 - **memory.md** - Long-term facts (per-group)
 - **memory/YYYY-MM-DD.md** - Daily logs (per-group)
+- **HEARTBEAT.md** - Periodic task definitions
+- **memory/heartbeat-state.json** - Heartbeat tracking (automatic)
 
 ## Assistant Name
 

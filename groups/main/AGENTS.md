@@ -6,14 +6,19 @@ You are {{ASSISTANT_NAME}}, a personal AI assistant running on Linux via AgentFo
 
 **IMPORTANT**: Before responding to any message, read these files to establish context:
 
-1. `SOUL.md` - Your identity and behavioral boundaries
-2. `TOOLS.md` - Environment and tools reference
-3. `USER.md` - User preferences and context
-4. `memory.md` - Long-term facts and patterns
-5. `memory/YYYY-MM-DD.md` - Today's daily log (if exists)
-6. `memory/YYYY-MM-DD.md` - Yesterday's daily log (if exists)
+1. `BOOTSTRAP.md` - First-time setup guidance (if this is your first session, then delete after setup)
+2. `IDENTITY.md` - Who you are (name, nature, vibe, emoji)
+3. `SOUL.md` - Core truths, boundaries, and personality
+4. `AGENTS.md` - Operational guidelines (this file)
+5. `TOOLS.md` - Environment and tools reference
+6. `USER.md` - User preferences and context
+7. `memory.md` - Long-term facts and patterns
+8. `memory/YYYY-MM-DD.md` - Today's daily log (if exists)
+9. `memory/YYYY-MM-DD.md` - Yesterday's daily log (if exists)
 
 This ensures continuity across sessions and maintains important context.
+
+Following [OpenClaw conventions](https://docs.openclaw.ai/reference/templates) for structured memory.
 
 ## What You Can Do
 

@@ -76,9 +76,10 @@ function readSecrets(): Record<string, string> {
  * Sets up:
  * - `settings.json` enabling agent teams and memory features
  * - Skills synced from the project-level `skills/` directory
- * - Shared template files (SOUL.md, TOOLS.md) copied from `groups/global/`
+ * - Shared template files (SOUL.md, TOOLS.md, IDENTITY.md, BOOTSTRAP.md, HEARTBEAT.md) copied from `groups/global/`
  * - Group-specific files (AGENTS.md, USER.md, memory.md) with defaults
  * - Today's daily memory log at `memory/YYYY-MM-DD.md`
+ * - Heartbeat state tracking at `memory/heartbeat-state.json`
  *
  * @param group - The registered group whose session directory to set up
  * @returns The path to the group's `.claude/` session directory
@@ -134,7 +135,7 @@ function setupGroupSession(group: RegisteredGroup): string {
   // AGENTS.md is NOT synced - it's group-specific
   const groupWorkspace = path.join(GROUPS_DIR, group.folder);
   const globalWorkspace = path.join(GROUPS_DIR, 'global');
-  const sharedTemplateFiles = ['SOUL.md', 'TOOLS.md'];
+  const sharedTemplateFiles = ['SOUL.md', 'TOOLS.md', 'IDENTITY.md', 'BOOTSTRAP.md', 'HEARTBEAT.md'];
 
   for (const templateFile of sharedTemplateFiles) {
     const srcFile = path.join(globalWorkspace, templateFile);
@@ -178,6 +179,17 @@ function setupGroupSession(group: RegisteredGroup): string {
   if (!fs.existsSync(todayLogPath)) {
     const todayTemplate = `# ${today}\n\n## Summary\n\n(Daily summary - updated throughout the day)\n\n## Conversations\n\n`;
     fs.writeFileSync(todayLogPath, todayTemplate, 'utf-8');
+  }
+
+  // Initialize heartbeat state tracking
+  const heartbeatStatePath = path.join(memoryDir, 'heartbeat-state.json');
+  if (!fs.existsSync(heartbeatStatePath)) {
+    const initialState = {
+      lastRun: null,
+      tasks: {},
+      version: '1.0.0',
+    };
+    fs.writeFileSync(heartbeatStatePath, JSON.stringify(initialState, null, 2), 'utf-8');
   }
 
   return groupSessionsDir;

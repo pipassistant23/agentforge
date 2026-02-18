@@ -15,14 +15,15 @@ groups/*
 !groups/global/
 groups/main/*
 groups/global/*
-!groups/main/CLAUDE.md
-!groups/global/CLAUDE.md
 !groups/main/AGENTS.md
 !groups/global/AGENTS.md
 !groups/main/SOUL.md
 !groups/global/SOUL.md
 !groups/main/TOOLS.md
 !groups/global/TOOLS.md
+!groups/global/BOOTSTRAP.md
+!groups/global/IDENTITY.md
+!groups/global/HEARTBEAT.md
 !groups/main/USER.md
 !groups/main/memory.md
 !groups/main/memory/
