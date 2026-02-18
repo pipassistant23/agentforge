@@ -83,6 +83,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install agent-runner dependencies
+        working-directory: agent-runner-src
+        run: npm ci
+
       - name: Build for analysis
         run: npm run build
 
