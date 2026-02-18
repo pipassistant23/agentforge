@@ -29,13 +29,13 @@ You are {{ASSISTANT_NAME}}, a personal assistant.
 
 Template substitution is applied to:
 
-1. **Global CLAUDE.md** (`groups/global/CLAUDE.md`)
+1. **Global AGENTS.md** (`groups/global/AGENTS.md`)
    - Loaded for all non-main groups
-   - Processed before being passed to the agent
+   - Processed before being passed to the agent as system prompt
 
-2. **Group CLAUDE.md** (`groups/{group}/CLAUDE.md`)
+2. **Group AGENTS.md** (`groups/{group}/AGENTS.md`)
    - Loaded for each specific group
-   - Processed before being passed to the agent
+   - Processed and appended to the system prompt
 
 3. **Conversation Transcripts** (archived conversations)
    - `ASSISTANT_NAME` used in speaker labels
@@ -49,16 +49,16 @@ Template substitution is applied to:
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. Agent runner starts                                       │
 ├─────────────────────────────────────────────────────────────┤
-│ 2. Read global/CLAUDE.md from disk                          │
+│ 2. Read global/AGENTS.md from disk (non-main groups only)   │
 │    "You are {{ASSISTANT_NAME}}, a personal assistant..."    │
 ├─────────────────────────────────────────────────────────────┤
-│ 3. Read group/CLAUDE.md from disk                           │
+│ 3. Read group/AGENTS.md from disk                           │
 │    "You are {{ASSISTANT_NAME}}, a personal assistant..."    │
 ├─────────────────────────────────────────────────────────────┤
 │ 4. Apply substituteVariables() to both                      │
 │    {{ASSISTANT_NAME}} → process.env.ASSISTANT_NAME || 'Andy'│
 ├─────────────────────────────────────────────────────────────┤
-│ 5. Combine and pass to Claude SDK                           │
+│ 5. Combine and pass to Claude SDK as systemPrompt.append    │
 │    "You are AgentForge, a personal assistant..."            │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -82,16 +82,16 @@ export function substituteVariables(content: string): string {
 ```typescript
 import { substituteVariables } from './template.js';
 
-// Load global CLAUDE.md
-if (fs.existsSync(globalClaudeMdPath)) {
-  const rawContent = fs.readFileSync(globalClaudeMdPath, 'utf-8');
-  globalClaudeMd = substituteVariables(rawContent);
+// Load global AGENTS.md (non-main groups only)
+if (!containerInput.isMain && fs.existsSync(globalAgentsMdPath)) {
+  const rawContent = fs.readFileSync(globalAgentsMdPath, 'utf-8');
+  globalAgentsMd = substituteVariables(rawContent);
 }
 
-// Load group CLAUDE.md
-if (fs.existsSync(groupClaudeMdPath)) {
-  const rawContent = fs.readFileSync(groupClaudeMdPath, 'utf-8');
-  groupClaudeMd = substituteVariables(rawContent);
+// Load group AGENTS.md
+if (fs.existsSync(groupAgentsMdPath)) {
+  const rawContent = fs.readFileSync(groupAgentsMdPath, 'utf-8');
+  groupAgentsMd = substituteVariables(rawContent);
 }
 ```
 
@@ -303,7 +303,7 @@ Potential additions for future versions:
 **Solution:**
 1. Check for spaces: Use `{{VAR}}` not `{{ VAR }}`
 2. Verify spelling: Must be exactly `ASSISTANT_NAME`
-3. Check file: `grep '{{ASSISTANT_NAME}}' groups/global/CLAUDE.md`
+3. Check file: `grep '{{ASSISTANT_NAME}}' groups/global/AGENTS.md`
 
 ### Wrong Name Appearing
 
@@ -311,7 +311,7 @@ Potential additions for future versions:
 
 **Solution:**
 1. Check which `.env` is loaded: `systemctl cat agentforge.service | grep EnvironmentFile`
-2. Verify file: `grep ASSISTANT_NAME /home/dustin/agentforge/.env`
+2. Verify file: `grep ASSISTANT_NAME .env`
 3. Check process env: `sudo journalctl -u agentforge.service | grep "trigger:"`
 
 ## Best Practices
@@ -340,9 +340,9 @@ Potential additions for future versions:
 ## Related Files
 
 - `agent-runner-src/src/template.ts` - Template substitution logic
-- `agent-runner-src/src/index.ts` - CLAUDE.md loading
-- `groups/global/CLAUDE.md` - Global agent instructions
-- `groups/main/CLAUDE.md` - Main group instructions
+- `agent-runner-src/src/index.ts` - AGENTS.md loading and system prompt assembly
+- `groups/global/AGENTS.md` - Global agent instructions
+- `groups/main/AGENTS.md` - Main group instructions
 - `.env.example` - Configuration template
 - `src/config.ts` - Environment variable loading
 - `scripts/verify-rebranding.sh` - Verification script

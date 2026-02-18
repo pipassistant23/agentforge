@@ -169,7 +169,7 @@ function initTasks() {
   console.log('Next steps:');
   console.log('1. Set MAIN_DM_CHAT_ID in .env with your Telegram DM chat ID');
   console.log('2. Set DREAM_CYCLE_TIMEZONE in .env (default: America/New_York)');
-  console.log('3. Restart the service: sudo systemctl restart pip.service');
+  console.log('3. Restart the service: sudo systemctl restart agentforge.service');
 }
 
 initTasks();

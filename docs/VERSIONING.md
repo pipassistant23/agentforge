@@ -24,12 +24,12 @@ Increment MAJOR when a change breaks backward compatibility for users who fork a
 
 Triggers:
 
-- Removing or renaming a configuration key that users are expected to set in `.env` or `groups/CLAUDE.md`
+- Removing or renaming a configuration key that users are expected to set in `.env` or `groups/{name}/AGENTS.md`
 - Changing the IPC message format in a way that requires updating `agent-runner-src/` and the host simultaneously
 - Dropping support for a Node.js LTS version currently listed in `engines` in `package.json`
 - Removing a feature that existed in the previous stable release (e.g., removing scheduled tasks support)
 - Changing the SQLite schema in a way that requires a manual migration (no automatic migration provided)
-- Renaming or moving key files that users are told to edit (`groups/{name}/CLAUDE.md`, `.env`, systemd unit)
+- Renaming or moving key files that users are told to edit (`groups/{name}/AGENTS.md`, `.env`, systemd unit)
 
 Example: `1.4.2` → `2.0.0`
 
@@ -132,8 +132,8 @@ The following are considered public interface and must not break across MINOR an
 | Interface | Notes |
 |-----------|-------|
 | `.env` variable names | New optional variables may be added; existing names must not be renamed |
-| `groups/{name}/CLAUDE.md` file location | Agents depend on this path |
-| `groups/global/CLAUDE.md` file location | Global memory path |
+| `groups/{name}/AGENTS.md` file location | Agents depend on this path for group instructions |
+| `groups/global/AGENTS.md`, `SOUL.md`, `TOOLS.md` file locations | Global template files synced to each group |
 | Systemd unit name `agentforge.service` | Users configure this in scripts |
 | IPC directory structure under `/data/ipc/` | Agent runner reads from here |
 | `npm run build` / `npm test` / `npm start` scripts | Documented developer commands |

@@ -37,9 +37,9 @@
 
 ## What is AgentForge?
 
-AgentForge turns a Linux server into a persistent, multi-tenant Claude AI assistant accessible through Telegram. Each Telegram group gets its own isolated workspace, its own persistent memory (`CLAUDE.md`), and its own agent process — conversations stay separate and context survives restarts.
+AgentForge turns a Linux server into a persistent, multi-tenant Claude AI assistant accessible through Telegram. Each Telegram group gets its own isolated workspace, persistent memory, and dedicated agent process — conversations stay separate and context survives restarts.
 
-The project is intentionally minimal. Its philosophy is that **capabilities belong in skills** — markdown instruction files that tell Claude Code how to extend your fork — not in source code. The core does one thing: route Telegram messages to Claude agents and keep them running reliably.
+The project is intentionally minimal. Its philosophy: **capabilities belong in skills** (markdown instruction files that extend your fork), not in source code. The core does one thing: route Telegram messages to Claude agents and keep them running reliably.
 
 ```
 User → Telegram → AgentForge (SQLite + message loop) → Claude Agent SDK → Response → Telegram
@@ -47,38 +47,48 @@ User → Telegram → AgentForge (SQLite + message loop) → Claude Agent SDK �
 
 ---
 
-## Key Features
+## ✨ Key Features
 
-- **Baremetal execution** — Agents start in ~100-200ms as native Node.js processes with no container overhead
-- **Per-group isolation** — Each chat group has a dedicated filesystem workspace and `CLAUDE.md` memory file; context never bleeds between groups
-- **Persistent sessions** — Conversations resume across restarts; Claude remembers prior context via the Claude Agent SDK session system
-- **Agent Swarms** — Spawn a coordinated team of sub-agents, each with its own Telegram bot identity and display name
-- **Scheduled tasks** — Natural-language task scheduling (cron, interval, or one-time) with per-group authorization
-- **Systemd service** — Runs persistently as a managed system service; auto-restarts on failure and loads secrets from `.env`
-- **File-based IPC** — Crash-safe bidirectional communication between orchestrator and agent processes using atomic file writes
-- **Follow-up messages** — Messages sent while an agent is still processing are piped into the running session without spawning a new process
-- **Two-level memory** — Global instructions (`groups/global/CLAUDE.md`) plus per-group memory (`groups/{name}/CLAUDE.md`)
-- **Skill-based extensibility** — Add capabilities by contributing skills, not by modifying source code
-- **Weekly automated releases** — Dependabot, CodeQL static analysis, and `npm audit` keep dependencies secure
+### Core Capabilities
+- **⚡ Baremetal execution** — Agents start in ~100-200ms as native Node.js processes (no container overhead)
+- **🔒 Per-group isolation** — Dedicated filesystem workspace and memory file per chat; context never bleeds between groups
+- **💾 Persistent sessions** — Conversations resume across restarts; full Claude Agent SDK session system
+- **🤝 Agent Swarms** — Spawn coordinated teams of sub-agents with unique Telegram bot identities
+- **⏰ Scheduled tasks** — Natural-language task scheduling (cron, interval, one-time) with per-group authorization
+- **📁 File operations** — Read/write files in group workspaces, persist data across conversations
+
+### Infrastructure
+- **🔄 Systemd service** — Runs persistently as managed system service; auto-restarts on failure
+- **🔐 Secure secrets** — Delivered via stdin, never in environment variables or disk
+- **📡 File-based IPC** — Crash-safe bidirectional communication using atomic file writes
+- **🚀 Follow-up messages** — New messages pipe into running sessions without spawning new processes
+- **🎯 Skill-based extensibility** — Add capabilities via `.claude/skills/` without modifying source
+- **🛡️ Security automation** — Weekly Dependabot updates, CodeQL analysis, and `npm audit` scans
 
 ---
 
-## Security Model
+## 🔐 Security Model
 
 AgentForge is designed for **dedicated servers** where the operator trusts themselves. It does not sandbox agents.
 
-| | AgentForge | [NanoClaw](https://github.com/gavrielc/nanoclaw) |
+| Feature | AgentForge | [NanoClaw](https://github.com/gavrielc/nanoclaw) |
 |---|---|---|
-| Container isolation | No — removed by design | Yes |
-| Intended environment | Dedicated / single-operator server | General / multi-tenant |
+| Container isolation | ❌ Removed by design | ✅ Yes |
+| Intended environment | Dedicated / single-operator | General / multi-tenant |
 | Agent filesystem access | Full (baremetal) | Sandboxed |
-| Secrets delivery | Via stdin, never environment variables | Via container env |
+| Secrets delivery | Via stdin (never env vars) | Container environment |
 
-Secrets are never written to disk or inherited by child processes. See [Architecture](#architecture) for details.
+**Security guarantees:**
+- Secrets never written to disk or inherited by child processes
+- Agent processes receive sanitized environment (explicit allowlist)
+- Bash commands auto-unset API keys before execution
+- Per-group authorization for IPC operations (messages, tasks, registration)
+
+See [Architecture](#architecture) for complete security model details.
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 Get AgentForge running in about five minutes.
 
@@ -86,11 +96,11 @@ Get AgentForge running in about five minutes.
 
 | Requirement | Notes |
 |---|---|
-| Linux (Ubuntu 22.04+ recommended) | Any modern distribution |
-| Node.js 20+ | Check with `node --version` |
-| [Claude Code CLI](https://claude.ai/download) | Installed and authenticated on the host |
-| Telegram bot token | From [@BotFather](https://t.me/BotFather) — free |
-| AI Provider API access | Anthropic API key, Claude Code OAuth token, or OpenAI-compatible provider |
+| 🐧 Linux (Ubuntu 22.04+) | Any modern distribution |
+| 📦 Node.js 20+ | Check with `node --version` |
+| 🤖 [Claude Code CLI](https://claude.ai/download) | Installed and authenticated on the host |
+| 💬 Telegram bot token | From [@BotFather](https://t.me/BotFather) — free |
+| 🔑 AI Provider API access | Anthropic API key, Claude Code OAuth token, or OpenAI-compatible provider |
 
 ### 1. Clone and install
 
@@ -206,26 +216,36 @@ Send any message to your registered chat. For the main group with `requires_trig
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
-All configuration is environment variables loaded from `.env`. The full reference lives in `src/config.ts`.
+All configuration uses environment variables loaded from `.env`. Full reference in `src/config.ts`.
+
+### Core Settings
 
 | Variable | Default | Description |
 |---|---|---|
-| `TELEGRAM_BOT_TOKEN` | — | **Required.** Primary Telegram bot token |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key (pay-per-use). One authentication method is required. |
-| `CLAUDE_CODE_OAUTH_TOKEN` | — | Claude subscription OAuth token (alternative to API key) |
-| `OPENAI_API_KEY` | — | OpenAI or compatible provider API key (alternative authentication) |
-| `OPENAI_BASE_URL` | — | Custom API endpoint for OpenAI-compatible providers |
-| `OPENAI_MODEL` | — | Model identifier for custom providers (provider-dependent) |
-| `ASSISTANT_NAME` | `Andy` | Trigger word — messages must start with `@Name` (case-insensitive) |
-| `TELEGRAM_BOT_POOL` | — | Comma-separated extra bot tokens for Agent Swarm personas |
-| `POLL_INTERVAL` | `2000` | Message poll interval in milliseconds |
-| `SCHEDULER_POLL_INTERVAL` | `60000` | Scheduler check interval in milliseconds |
-| `AGENT_TIMEOUT` | `1800000` | Maximum agent runtime per invocation (30 min) |
-| `IDLE_TIMEOUT` | `1800000` | How long to keep an idle agent process alive (30 min) |
+| `TELEGRAM_BOT_TOKEN` | — | **Required.** Primary Telegram bot token from [@BotFather](https://t.me/BotFather) |
+| `ASSISTANT_NAME` | `Andy` | Trigger word — messages start with `@Name` (case-insensitive) |
+| `TELEGRAM_BOT_POOL` | — | Comma-separated bot tokens for Agent Swarm sub-agent personas |
+
+### Authentication (Choose One)
+
+| Variable | Type | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Pay-per-use | Anthropic API key (`sk-ant-api03-...`) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Subscription | Claude Code OAuth token (`sk-ant-oat01-...`) |
+| `OPENAI_API_KEY` + `OPENAI_BASE_URL` | Custom provider | OpenAI-compatible API endpoint |
+
+### Advanced Settings
+
+| Variable | Default | Description |
+|---|---|---|
+| `POLL_INTERVAL` | `2000` | Message poll interval (milliseconds) |
+| `SCHEDULER_POLL_INTERVAL` | `60000` | Task scheduler check interval (milliseconds) |
+| `AGENT_TIMEOUT` | `1800000` | Max agent runtime per invocation (30 min) |
+| `IDLE_TIMEOUT` | `1800000` | How long to keep idle agent processes alive (30 min) |
 | `MAX_CONCURRENT_PROCESSES` | `5` | Maximum simultaneous agent processes across all groups |
-| `TZ` | System timezone | Timezone for cron expressions |
+| `TZ` | System | Timezone for cron expressions |
 
 ### Changing the assistant name
 
@@ -274,9 +294,9 @@ Or insert directly into SQLite and restart. Set `requires_trigger=1` for group c
 
 ---
 
-## Usage
+## 💬 Usage
 
-### Basic conversation
+### Basic Conversation
 
 ```
 @YourAgent what are the top Hacker News stories today?
@@ -284,9 +304,9 @@ Or insert directly into SQLite and restart. Set `requires_trigger=1` for group c
 @YourAgent help me draft a reply to this email: [paste email]
 ```
 
-### File operations
+### File Operations
 
-Claude can read and write files in your group's workspace at `groups/{groupName}/`:
+Read and write files in your group's workspace at `groups/{groupName}/`:
 
 ```
 @YourAgent save these meeting notes to a file called meeting-2026-02-18.md
@@ -294,9 +314,9 @@ Claude can read and write files in your group's workspace at `groups/{groupName}
 @YourAgent read back the notes from last week's meeting
 ```
 
-### Scheduled tasks
+### Scheduled Tasks
 
-Claude understands natural language scheduling. Tasks persist across restarts.
+Natural language scheduling — tasks persist across restarts:
 
 ```
 @YourAgent every weekday at 9am, check Hacker News and send me the top 5 AI stories
@@ -304,7 +324,7 @@ Claude understands natural language scheduling. Tasks persist across restarts.
 @YourAgent at 5pm today, send me a summary of what we discussed
 ```
 
-Managing tasks:
+**Managing tasks:**
 
 ```
 @YourAgent list my scheduled tasks
@@ -313,21 +333,22 @@ Managing tasks:
 @YourAgent resume task 3
 ```
 
-### Agent Swarms
+### Agent Swarms (Teams)
 
-When `TELEGRAM_BOT_POOL` is configured with additional bot tokens, Claude can spin up a named team of sub-agents. Each sub-agent gets its own Telegram bot identity:
+Configure `TELEGRAM_BOT_POOL` to spawn coordinated teams. Each sub-agent gets its own bot identity:
 
 ```
-@YourAgent assemble a team: a marine biologist, a physicist, and a science writer to collaborate on explaining bioluminescence to a general audience
+@YourAgent assemble a team: a marine biologist, a physicist, and a science writer
+to collaborate on explaining bioluminescence to a general audience
 ```
 
-The group chat shows three distinct bots — "Marine Biologist," "Physicist," and "Science Writer" — posting independently and building on each other's contributions.
+The chat shows three distinct bots — "Marine Biologist," "Physicist," and "Science Writer" — posting independently and collaborating in real-time.
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-AgentForge is a **single Node.js process** with three concurrent polling loops.
+AgentForge is a **single Node.js orchestrator** with three concurrent polling loops.
 
 ```
                      ┌─────────────────────────────────────────┐
@@ -402,190 +423,245 @@ For the complete architecture reference, see [docs/ARCHITECTURE.md](docs/ARCHITE
 
 ---
 
-## File Structure
+## 📂 File Structure
 
 ```
 agentforge/
 ├── src/                          # TypeScript orchestrator source
 │   ├── index.ts                  # Main entry: state, message loop, agent invocation
-│   ├── channels/
-│   │   └── telegram.ts           # Telegram bot + bot pool for Agent Swarms
+│   ├── channels/telegram.ts      # Telegram bot + bot pool for Agent Swarms
 │   ├── bare-metal-runner.ts      # Spawns and manages agent processes
 │   ├── ipc.ts                    # File-based IPC watcher
 │   ├── router.ts                 # Message formatting and routing
 │   ├── task-scheduler.ts         # Cron/scheduled task runner
 │   ├── config.ts                 # Configuration constants
 │   └── db.ts                     # SQLite operations
-├── agent-runner-src/             # Agent runtime (isolated child process)
+│
+├── agent-runner-src/             # Agent runtime (spawned as child process)
 │   └── src/
 │       ├── index.ts              # Agent entry point, SDK integration, IPC polling
 │       └── ipc-mcp-stdio.ts      # MCP server exposing task/message tools to Claude
-├── groups/                       # Per-group workspaces (checked in)
+│
+├── groups/                       # Per-group workspaces (checked into git)
 │   ├── global/
-│   │   └── CLAUDE.md             # Shared agent instructions (all groups)
+│   │   ├── AGENTS.md             # Global agent instructions (all groups)
+│   │   ├── SOUL.md               # Identity and behavioral boundaries
+│   │   └── TOOLS.md              # Environment and tool reference
 │   └── {groupName}/
-│       └── CLAUDE.md             # Group-specific memory and instructions
+│       ├── AGENTS.md             # Group-specific instructions
+│       ├── memory.md             # Long-term memory
+│       └── memory/YYYY-MM-DD.md  # Daily logs
+│
+├── .claude/skills/               # Skill-based extensions (not in source)
 ├── docs/                         # Extended documentation
-├── .github/workflows/            # CI/CD pipelines
-├── data/                         # Runtime state — gitignored
-│   ├── ipc/{group}/              # Agent IPC directories
-│   └── sessions/{group}/         # Claude session transcripts
-└── store/                        # SQLite database — gitignored
+├── .github/workflows/            # CI/CD automation
+│
+├── data/                         # Runtime state (gitignored)
+│   ├── ipc/{group}/              # File-based IPC directories
+│   └── sessions/{group}/         # Claude Agent SDK session transcripts
+│
+└── store/                        # SQLite database (gitignored)
+    └── messages.db               # Messages, groups, tasks, sessions
 ```
 
 ---
 
-## Development
+## 🛠️ Development
+
+### Build Commands
 
 ```bash
-npm run build        # Compile TypeScript to dist/
-npm run dev          # Run directly with tsx (no build step, verbose output)
+npm run build        # Compile TypeScript (orchestrator + agent runner)
+npm run dev          # Run directly with tsx (no build, verbose logs)
 npm test             # Run Vitest test suite
-npm run typecheck    # Type-check without emitting files
-npm run format       # Format source with Prettier
-npm run format:check # Check formatting (used in CI)
+npm run typecheck    # Type-check without emitting
+npm run format       # Format with Prettier
+npm run format:check # Check formatting (CI)
 ```
 
-After any source change, rebuild and restart:
+### Development Workflow
 
+**After source changes:**
 ```bash
-npm run build && sudo systemctl restart agentforge.service
+npm run build
+cd agent-runner-src && npm run build && cd ..
+sudo systemctl restart agentforge.service
 ```
 
-Verify you are running fresh code by comparing timestamps:
-
+**Verify fresh code:**
 ```bash
-ls -lh dist/index.js                       # Build time
+ls -lh dist/index.js                       # Build timestamp
 sudo systemctl status agentforge.service   # Process start time
 ```
 
-Follow live logs:
-
+**Live logs:**
 ```bash
 sudo journalctl -u agentforge.service -f
 ```
 
+**Local debugging:**
+```bash
+npm run dev  # Runs with tsx, no build step, full terminal output
+```
+
 ---
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
-### Service will not start
+### Service Won't Start
 
+Check recent logs:
 ```bash
 sudo journalctl -u agentforge.service -n 50 --no-pager
 ```
 
-Check that `TELEGRAM_BOT_TOKEN` and one authentication variable are set in `.env`. Verify the `node` binary path in the service file matches `which node`.
+**Common issues:**
+- `TELEGRAM_BOT_TOKEN` and one auth method must be set in `.env`
+- Verify node path in service file matches `which node`
+- Check `.env` file permissions and syntax
 
-### Agent does not respond
+### Agent Doesn't Respond
 
-- Confirm the group is registered: `sqlite3 store/messages.db "SELECT jid, name FROM registered_groups;"`
-- Confirm your message starts with the trigger word: `@YourAgent ...`
-- Follow live logs: `sudo journalctl -u agentforge.service -f`
+**Checklist:**
+1. Confirm group is registered: `sqlite3 store/messages.db "SELECT jid, name FROM registered_groups;"`
+2. Verify message starts with trigger: `@YourAgent ...`
+3. Check live logs: `sudo journalctl -u agentforge.service -f`
+4. Ensure bot is admin in group chats (Telegram requirement)
 
-### Running old code after a change
+### Running Old Code After Changes
 
-The running service does not auto-reload. Always restart after rebuilding:
-
+The service doesn't auto-reload. Always restart after building:
 ```bash
-npm run build && sudo systemctl restart agentforge.service
+npm run build
+cd agent-runner-src && npm run build && cd ..
+sudo systemctl restart agentforge.service
 ```
 
-### Debugging locally
+### Local Debugging
 
+Run without systemd for full output:
 ```bash
 npm run dev
 ```
 
-Runs the orchestrator directly with `tsx` — no build step, full output in the terminal.
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for comprehensive debugging guide.
 
 ---
 
-## CI / CD
+## 🚢 CI/CD & Releases
 
-All workflows live in `.github/workflows/`.
+### Automated Workflows
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
-| `ci.yml` | PRs and `main` pushes | Type check, format check, tests, build verification |
-| `lint.yml` | PRs and `main` pushes | Prettier format check with PR comments, TypeScript strict check |
-| `security-scan.yml` | PRs, `main` pushes, weekly | `npm audit` for high/critical CVEs; CodeQL static analysis |
-| `release.yml` | `v*.*.*` tags | Full build and test, then GitHub Release with auto-generated changelog |
-| `test.yml` | PRs to `main` | Lightweight pre-merge gate: type check and Vitest |
-| `skills-only.yml` | PRs to `main` | Prevents skill PRs from accidentally touching source files |
+| `ci.yml` | PRs, `main` pushes | Type check, format, tests, build verification |
+| `security-scan.yml` | PRs, `main`, weekly | `npm audit` (high/critical CVEs), CodeQL analysis |
+| `test.yml` | PRs to `main` | Pre-merge gate: type check + Vitest |
+| `release.yml` | `v*.*.*` tags | Build, test, publish GitHub Release with changelog |
+| `skills-only.yml` | PRs to `main` | Prevents skill PRs from touching source code |
 
-### Releases
+### Creating a Release
 
-Tag a commit to trigger an automated GitHub Release:
-
+Tag a commit to trigger automated release:
 ```bash
-git tag -a v1.2.3 -m "Release v1.2.3: brief description"
+git tag -a v1.2.3 -m "Release v1.2.3: description"
 git push origin v1.2.3
 ```
 
-The release workflow runs the full build and test suite, then publishes a release with a changelog generated from commits since the previous tag. Pre-release tags (`v1.2.3-beta.1`) are automatically marked as pre-releases.
+The workflow builds, tests, and publishes with auto-generated changelog. Pre-release tags (`v1.2.3-beta.1`) are marked as pre-releases automatically.
 
-See [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) and [docs/VERSIONING.md](docs/VERSIONING.md) for the full release policy.
+📖 See [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) and [docs/VERSIONING.md](docs/VERSIONING.md) for full policy.
 
-### Dependency updates
+### Dependency Updates
 
-Dependabot opens weekly PRs (Mondays) for root npm packages, `agent-runner-src/` packages, and GitHub Actions versions. Minor and patch updates are grouped to reduce noise; major updates are individual PRs.
+Dependabot opens weekly PRs (Mondays) for:
+- Root npm packages
+- `agent-runner-src/` packages
+- GitHub Actions versions
+
+Minor/patch updates are grouped; major updates are individual PRs.
 
 ---
 
-## Documentation
+## 📚 Documentation
 
-| Document | Contents |
+### Core Documentation
+
+| Document | Description |
 |---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Full system architecture, component reference, data flow diagrams, IPC mechanism |
-| [docs/INSTALLATION.md](docs/INSTALLATION.md) | Step-by-step installation guide, systemd setup, first-run group registration |
-| [docs/VERSIONING.md](docs/VERSIONING.md) | Semantic versioning policy, backward compatibility guarantees |
-| [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) | Release checklist, tagging, rollback procedure |
-| [docs/SPEC.md](docs/SPEC.md) | Full system specification and message flow |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines, skill vs. source change policy, changelog requirements |
-| [CHANGELOG.md](CHANGELOG.md) | Version history and migration notes |
+| [**ARCHITECTURE.md**](docs/ARCHITECTURE.md) | Complete system architecture, component reference, data flow, IPC mechanism |
+| [**INSTALLATION.md**](docs/INSTALLATION.md) | Step-by-step installation, systemd setup, first-run configuration |
+| [**TROUBLESHOOTING.md**](docs/TROUBLESHOOTING.md) | Common issues, debugging techniques, log analysis |
+| [**TEMPLATE_SYSTEM.md**](docs/TEMPLATE_SYSTEM.md) | AGENTS.md template system, variable substitution, per-group configuration |
+
+### Development & Release
+
+| Document | Description |
+|---|---|
+| [**DEVELOPMENT.md**](docs/DEVELOPMENT.md) | Development workflow, testing, debugging |
+| [**VERSIONING.md**](docs/VERSIONING.md) | Semantic versioning policy, backward compatibility |
+| [**RELEASE_PROCESS.md**](docs/RELEASE_PROCESS.md) | Release checklist, tagging, rollback procedure |
+| [**CONTRIBUTING.md**](CONTRIBUTING.md) | Contribution guidelines, skills vs source changes, changelog requirements |
+| [**CHANGELOG.md**](CHANGELOG.md) | Version history and migration notes |
+
+### Reference
+
+| Document | Description |
+|---|---|
+| [**API.md**](docs/API.md) | MCP server tools, IPC protocol, data structures |
+| [**TEMPLATE_VARIABLES.md**](docs/TEMPLATE_VARIABLES.md) | Available template variables for AGENTS.md files |
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-AgentForge welcomes contributions. The project has a deliberate philosophy about what belongs in source code vs. skills.
+AgentForge welcomes contributions. The project has a deliberate philosophy: **capabilities belong in skills, not source code**.
 
-**Accepted as source changes:**
+### Source Code Changes
+
+✅ **Accepted:**
 - Bug fixes
 - Security fixes
 - Simplifications that reduce code
 
-**Not accepted as source changes:**
+❌ **Not accepted:**
 - New features or capabilities
 - Compatibility shims
 - Enhancements
 
-**New capabilities belong in skills** — markdown files in `.claude/skills/` that instruct Claude Code how to transform a fork. A skill PR should touch only skill files, not source. This keeps the core clean for everyone while letting individuals add exactly the features they need.
+### Skills
 
-### How to contribute
+New capabilities belong in **skills** — markdown files in `.claude/skills/` that teach Claude Code how to transform a fork. Skills keep the core minimal while letting individuals add exactly what they need.
 
-1. Fork the repository
-2. Create a branch: `git checkout -b fix/describe-the-fix`
-3. Make your change and add a `CHANGELOG.md` entry under `[Unreleased]` (required for source changes)
-4. Follow [Conventional Commits](https://www.conventionalcommits.org/): `fix: prevent duplicate messages on restart`
-5. Open a pull request — CI will run type checking, tests, and security scans automatically
+**Examples:** `/convert-to-docker`, `/add-telegram`, `/add-gmail`
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the complete guidelines including changelog requirements and commit message conventions.
+### How to Contribute
 
----
+1. **Fork** the repository
+2. **Create branch:** `git checkout -b fix/describe-the-fix`
+3. **Make changes:**
+   - Add entry to `CHANGELOG.md` under `[Unreleased]` (source changes only)
+   - Follow [Conventional Commits](https://www.conventionalcommits.org/): `fix: prevent duplicate messages`
+4. **Open PR** — CI runs automatically (type check, tests, security scans)
 
-## Credits
-
-**Based on:**
-- [NanoClaw](https://github.com/gavrielc/nanoclaw) by [@gavrielc](https://github.com/gavrielc) — core architecture, Claude Agent SDK integration, and file-based IPC design
-
-**Inspired by:**
-- [OpenClaw](https://github.com/openclaw/openclaw) — memory structure and workspace organization patterns
-- [Ray Fernando](https://github.com/RayFernando1337) — dream cycle and memory consolidation system ([video](https://youtu.be/AuofNgImNhk))
+📖 Full guidelines: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
-## License
+## 🙏 Credits & License
 
+### Based On
+- [**NanoClaw**](https://github.com/gavrielc/nanoclaw) by [@gavrielc](https://github.com/gavrielc) — Core architecture, Claude Agent SDK integration, file-based IPC design
+
+### Inspired By
+- [**OpenClaw**](https://github.com/openclaw/openclaw) — Memory structure and workspace organization patterns
+- [**Ray Fernando**](https://github.com/RayFernando1337) — Dream cycle and memory consolidation system ([video](https://youtu.be/AuofNgImNhk))
+
+### License
 MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+  <sub>Built with ❤️ for the Claude Agent SDK community</sub>
+</div>

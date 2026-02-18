@@ -1,7 +1,22 @@
 /**
  * Stdio MCP Server for AgentForge
- * Standalone process that agent teams subagents can inherit.
- * Reads context from environment variables, writes IPC files for the host.
+ *
+ * Runs as a standalone subprocess that the Claude Agent SDK spawns for each
+ * agent session. Exposes AgentForge-specific tools to the agent over the
+ * Model Context Protocol (MCP) stdio transport.
+ *
+ * Communication with the host orchestrator happens entirely through the
+ * file-based IPC system: each tool writes a JSON file to the group's
+ * IPC directory, which the host's IPC watcher picks up and acts on.
+ * This design means the MCP server itself is stateless — it never needs
+ * a network connection back to the host, and sub-agents spawned by agent
+ * swarms inherit this server automatically.
+ *
+ * Context is read from environment variables set by the agent runner:
+ *   WORKSPACE_IPC          - Base IPC directory for this group
+ *   AGENTFORGE_CHAT_JID    - JID of the chat this agent is serving
+ *   AGENTFORGE_GROUP_FOLDER - Folder name of the group
+ *   AGENTFORGE_IS_MAIN     - '1' if this is the main orchestrator group
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -21,6 +36,17 @@ const chatJid = process.env.AGENTFORGE_CHAT_JID!;
 const groupFolder = process.env.AGENTFORGE_GROUP_FOLDER!;
 const isMain = process.env.AGENTFORGE_IS_MAIN === '1';
 
+/**
+ * Write a JSON payload atomically to an IPC directory.
+ *
+ * Uses a write-then-rename pattern: the file is first written to a `.tmp`
+ * path, then renamed to its final name. This prevents the host's IPC watcher
+ * from reading a partially-written file.
+ *
+ * @param dir - Target directory (created if it doesn't exist)
+ * @param data - The payload to serialize as JSON
+ * @returns The filename (not path) of the written file
+ */
 function writeIpcFile(dir: string, data: object): string {
   fs.mkdirSync(dir, { recursive: true });
 
@@ -40,6 +66,20 @@ const server = new McpServer({
   version: '1.0.0',
 });
 
+/**
+ * send_message tool
+ *
+ * Delivers a message to the group chat immediately, without waiting for the
+ * agent to finish its current response. Useful for progress updates in long
+ * tasks or when the agent wants to send multiple separate messages.
+ *
+ * For scheduled tasks, this is the only way to communicate with the user —
+ * the task agent's final result text is NOT automatically forwarded.
+ *
+ * When a `sender` identity is provided and the Telegram bot pool is configured,
+ * the message is sent from a dedicated pool bot, giving sub-agents their own
+ * named identity in the chat (e.g., "Researcher", "Coder").
+ */
 server.tool(
   'send_message',
   "Send a message to the user or group immediately while you're still running. Use this for progress updates or to send multiple messages. You can call this multiple times. Note: when running as a scheduled task, your final output is NOT sent to the user — use this tool if you need to communicate with the user or group.",
@@ -63,6 +103,23 @@ server.tool(
   },
 );
 
+/**
+ * schedule_task tool
+ *
+ * Creates a recurring or one-time scheduled task. The task runs as a full
+ * agent invocation with access to all tools, at the specified schedule.
+ *
+ * Context modes:
+ * - 'group': Agent runs with access to the group's conversation history
+ * - 'isolated': Agent starts fresh with no conversation history; the prompt
+ *   should contain all necessary context
+ *
+ * Authorization: non-main groups can only schedule tasks for themselves.
+ * The main group can schedule tasks for any registered group via target_group_jid.
+ *
+ * Validates the schedule_value before writing the IPC file so the agent gets
+ * immediate feedback on invalid expressions rather than a silent failure.
+ */
 server.tool(
   'schedule_task',
   `Schedule a recurring or one-time task. The task will run as a full agent with access to all tools.
@@ -94,7 +151,7 @@ SCHEDULE VALUE FORMAT (all times are LOCAL timezone):
     target_group_jid: z.string().optional().describe('(Main group only) JID of the group to schedule the task for. Defaults to the current group.'),
   },
   async (args) => {
-    // Validate schedule_value before writing IPC
+    // Validate schedule_value before writing IPC — gives the agent immediate feedback
     if (args.schedule_type === 'cron') {
       try {
         CronExpressionParser.parse(args.schedule_value);
@@ -122,7 +179,7 @@ SCHEDULE VALUE FORMAT (all times are LOCAL timezone):
       }
     }
 
-    // Non-main groups can only schedule for themselves
+    // Non-main groups can only schedule for themselves; main can target any group
     const targetJid = isMain && args.target_group_jid ? args.target_group_jid : chatJid;
 
     const data = {
@@ -144,6 +201,15 @@ SCHEDULE VALUE FORMAT (all times are LOCAL timezone):
   },
 );
 
+/**
+ * list_tasks tool
+ *
+ * Reads the pre-written current_tasks.json snapshot from the IPC directory.
+ * The snapshot is written by the host before each agent invocation, so it
+ * reflects the state at the time the agent was started — not necessarily live.
+ *
+ * Main group sees all tasks; other groups see only their own.
+ */
 server.tool(
   'list_tasks',
   "List all scheduled tasks. From main: shows all tasks. From other groups: shows only that group's tasks.",
@@ -158,6 +224,7 @@ server.tool(
 
       const allTasks = JSON.parse(fs.readFileSync(tasksFile, 'utf-8'));
 
+      // The snapshot is pre-filtered by the host, but apply an extra filter for safety
       const tasks = isMain
         ? allTasks
         : allTasks.filter((t: { groupFolder: string }) => t.groupFolder === groupFolder);
@@ -182,6 +249,12 @@ server.tool(
   },
 );
 
+/**
+ * pause_task tool
+ *
+ * Writes a pause_task IPC request for the host to act on.
+ * The host enforces authorization (non-main groups can only pause their own tasks).
+ */
 server.tool(
   'pause_task',
   'Pause a scheduled task. It will not run until resumed.',
@@ -201,6 +274,12 @@ server.tool(
   },
 );
 
+/**
+ * resume_task tool
+ *
+ * Writes a resume_task IPC request for the host to act on.
+ * The host enforces authorization (non-main groups can only resume their own tasks).
+ */
 server.tool(
   'resume_task',
   'Resume a paused task.',
@@ -220,6 +299,13 @@ server.tool(
   },
 );
 
+/**
+ * cancel_task tool
+ *
+ * Writes a cancel_task IPC request for the host to act on.
+ * Cancellation permanently deletes the task and its run logs.
+ * The host enforces authorization (non-main groups can only cancel their own tasks).
+ */
 server.tool(
   'cancel_task',
   'Cancel and delete a scheduled task.',
@@ -239,6 +325,15 @@ server.tool(
   },
 );
 
+/**
+ * register_group tool
+ *
+ * Writes a register_group IPC request that activates a chat JID so the agent
+ * starts receiving and responding to messages from it. Main group only.
+ *
+ * The available groups list (available_groups.json) is written by the host
+ * before each agent invocation and contains the JIDs of all known chats.
+ */
 server.tool(
   'register_group',
   `Register a new WhatsApp group so the agent can respond to messages there. Main group only.
@@ -275,6 +370,6 @@ Use available_groups.json to find the JID for a group. The folder name should be
   },
 );
 
-// Start the stdio transport
+// Start the stdio transport — the SDK connects via stdin/stdout
 const transport = new StdioServerTransport();
 await server.connect(transport);

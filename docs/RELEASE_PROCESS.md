@@ -249,7 +249,7 @@ After deploying to production, confirm the running process is the new version:
 
 ```bash
 # Check dist/ build time vs. service start time
-ls -la /home/dustin/agentforge/dist/index.js
+ls -la dist/index.js
 sudo systemctl status agentforge.service
 ```
 

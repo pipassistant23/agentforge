@@ -95,9 +95,15 @@ agentforge/
 │   └── tsconfig.json
 ├── groups/
 │   ├── main/                 # Main group workspace
-│   │   └── CLAUDE.md         # Agent instructions
+│   │   ├── AGENTS.md         # Group-specific agent instructions
+│   │   ├── SOUL.md           # Identity and behavioral boundaries (synced)
+│   │   ├── TOOLS.md          # Tool reference (synced)
+│   │   ├── USER.md           # User preferences
+│   │   └── memory.md         # Long-term memory
 │   └── global/
-│       └── CLAUDE.md         # Global settings
+│       ├── AGENTS.md         # Global agent instructions template
+│       ├── SOUL.md           # Shared identity template
+│       └── TOOLS.md          # Shared tool reference template
 ├── dist/                     # Compiled JavaScript (generated)
 ├── store/                    # SQLite database (generated)
 ├── data/                     # IPC and runtime data (generated)

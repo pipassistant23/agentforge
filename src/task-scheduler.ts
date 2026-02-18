@@ -1,3 +1,13 @@
+/**
+ * Scheduled task runner for AgentForge.
+ *
+ * Polls the database for due tasks and runs them as agent processes via
+ * the bare-metal runner. Each task gets its own agent invocation with
+ * either a fresh isolated session or the group's existing conversation
+ * session, depending on the task's context_mode.
+ *
+ * Results are forwarded to the target group's chat and logged to the DB.
+ */
 import { ChildProcess } from 'child_process';
 import { CronExpressionParser } from 'cron-parser';
 import fs from 'fs';
@@ -26,6 +36,7 @@ import { GroupQueue } from './group-queue.js';
 import { logger } from './logger.js';
 import { RegisteredGroup, ScheduledTask } from './types.js';
 
+/** Dependencies injected into the scheduler to decouple it from the orchestrator. */
 export interface SchedulerDependencies {
   registeredGroups: () => Record<string, RegisteredGroup>;
   getSessions: () => Record<string, string>;
@@ -39,6 +50,24 @@ export interface SchedulerDependencies {
   sendMessage: (jid: string, text: string) => Promise<void>;
 }
 
+/**
+ * Execute a single scheduled task as an agent process.
+ *
+ * Looks up the registered group for the task, writes a tasks snapshot
+ * so the agent can read its own schedule, then runs the agent via the
+ * bare-metal runner. Streaming results are forwarded to the user in real
+ * time via `deps.sendMessage`.
+ *
+ * An idle timer closes stdin after IDLE_TIMEOUT of no output — this causes
+ * the agent to exit cleanly rather than hanging at its IPC poll loop.
+ *
+ * After the run, the result and next_run timestamp are persisted to the DB.
+ * One-time tasks ("once" schedule type) have no next_run and are marked
+ * "completed" by `updateTaskAfterRun`.
+ *
+ * @param task - The scheduled task record to execute
+ * @param deps - Scheduler dependencies (sessions, queue, send)
+ */
 async function runTask(
   task: ScheduledTask,
   deps: SchedulerDependencies,
@@ -93,13 +122,14 @@ async function runTask(
   let result: string | null = null;
   let error: string | null = null;
 
-  // For group context mode, use the group's current session
+  // 'group' context mode reuses the group's live conversation session,
+  // giving the agent access to chat history. 'isolated' always starts fresh.
   const sessions = deps.getSessions();
   const sessionId =
     task.context_mode === 'group' ? sessions[task.group_folder] : undefined;
 
-  // Idle timer: writes _close sentinel after IDLE_TIMEOUT of no output,
-  // so the process exits instead of hanging at waitForIpcMessage forever.
+  // Idle timer: closes stdin after IDLE_TIMEOUT of no streaming output,
+  // so the agent exits rather than waiting indefinitely for IPC messages.
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   const resetIdleTimer = () => {
@@ -170,6 +200,7 @@ async function runTask(
     error,
   });
 
+  // Compute next run time for recurring tasks; null signals "completed" to updateTaskAfterRun
   let nextRun: string | null = null;
   if (task.schedule_type === 'cron') {
     const interval = CronExpressionParser.parse(task.schedule_value, {
@@ -190,8 +221,19 @@ async function runTask(
   updateTaskAfterRun(task.id, nextRun, resultSummary);
 }
 
+/** Prevents startSchedulerLoop from being called more than once. */
 let schedulerRunning = false;
 
+/**
+ * Start the scheduler polling loop.
+ *
+ * On each tick, queries the DB for tasks whose `next_run` is in the past,
+ * re-checks each task's status (in case it was paused since the query),
+ * then enqueues it through the GroupQueue so it runs serially with any
+ * concurrent message-driven agent invocations for the same group.
+ *
+ * @param deps - Scheduler dependencies including queue and session state
+ */
 export function startSchedulerLoop(deps: SchedulerDependencies): void {
   if (schedulerRunning) {
     logger.debug('Scheduler loop already running, skipping duplicate start');
@@ -208,7 +250,8 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
       }
 
       for (const task of dueTasks) {
-        // Re-check task status in case it was paused/cancelled
+        // Re-check task status in case it was paused/cancelled between
+        // the getDueTasks query and here — avoid running stale tasks
         const currentTask = getTaskById(task.id);
         if (!currentTask || currentTask.status !== 'active') {
           continue;

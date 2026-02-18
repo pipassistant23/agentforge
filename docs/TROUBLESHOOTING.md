@@ -51,10 +51,10 @@ sudo journalctl -u agentforge.service --no-pager -n 100 | tail -30
 1. **Database corruption:**
    ```bash
    # Check SQLite database integrity
-   sqlite3 /path/to/store/agentforge.db ".tables"
+   sqlite3 /path/to/store/messages.db ".tables"
 
    # If corrupted, back it up and delete
-   rm /path/to/store/agentforge.db
+   rm /path/to/store/messages.db
    # Service will recreate on next start
    ```
 
@@ -78,7 +78,7 @@ sudo journalctl -u agentforge.service --no-pager -n 100 | tail -30
    sudo systemctl restart agentforge.service
    ```
 
-### "No such file or directory: agent-runner/dist/index.js"
+### "No such file or directory: agent-runner-src/dist/index.js"
 
 **Cause:** Agent runner source was not built.
 
@@ -110,7 +110,7 @@ ps aux | grep agentforge
 
 # Verify file permissions
 ls -la /var/agentforge/
-ls -la store/agentforge.db
+ls -la store/messages.db
 
 # If needed, fix permissions
 sudo chown agentforge:agentforge /var/agentforge -R
@@ -210,13 +210,13 @@ cat groups/main/logs/agent-*.log | grep -A 20 "Stderr"
 **Diagnosis:**
 ```bash
 # Check if messages are in the database
-sqlite3 store/agentforge.db "SELECT COUNT(*) FROM messages;"
+sqlite3 store/messages.db "SELECT COUNT(*) FROM messages;"
 
 # Check if group is registered
-sqlite3 store/agentforge.db "SELECT * FROM registered_groups;"
+sqlite3 store/messages.db "SELECT * FROM registered_groups;"
 
 # Check router state (last processed timestamp)
-sqlite3 store/agentforge.db "SELECT * FROM router_state;"
+sqlite3 store/messages.db "SELECT * FROM router_state;"
 ```
 
 **Solutions:**
@@ -334,14 +334,14 @@ sudo journalctl -u agentforge.service | grep "task"
 
 2. **Invalid JID format:**
    ```bash
-   # Valid: "tg:123456789" or "wa:123456789"
+   # Valid: "tg:123456789"
    # Invalid: "telegram:123456789" or just "123456789"
    ```
 
 3. **targetJid not registered:**
    ```bash
    # First register the group
-   sqlite3 store/agentforge.db "SELECT jid FROM registered_groups;"
+   sqlite3 store/messages.db "SELECT jid FROM registered_groups;"
    ```
 
 ---
@@ -384,10 +384,10 @@ watch -n 5 'ps aux | grep "node dist"'
 3. **Optimize database:**
    ```bash
    # Clean up old messages (keep last 1000)
-   sqlite3 store/agentforge.db "DELETE FROM messages WHERE timestamp < (SELECT timestamp FROM messages ORDER BY timestamp DESC LIMIT 1 OFFSET 1000);"
+   sqlite3 store/messages.db "DELETE FROM messages WHERE timestamp < (SELECT timestamp FROM messages ORDER BY timestamp DESC LIMIT 1 OFFSET 1000);"
 
    # Vacuum to reclaim space
-   sqlite3 store/agentforge.db "VACUUM;"
+   sqlite3 store/messages.db "VACUUM;"
    ```
 
 4. **Check for agent process leaks:**
@@ -414,7 +414,7 @@ watch -n 5 'ps aux | grep "node dist"'
 
 1. **Check message storage:**
    ```bash
-   sqlite3 store/agentforge.db \
+   sqlite3 store/messages.db \
      "SELECT sender_name, content, timestamp FROM messages WHERE chat_jid='tg:123456789' ORDER BY timestamp DESC LIMIT 5;"
    ```
 
@@ -433,7 +433,7 @@ watch -n 5 'ps aux | grep "node dist"'
 
 3. **Check if group is registered:**
    ```bash
-   sqlite3 store/agentforge.db \
+   sqlite3 store/messages.db \
      "SELECT jid, name, folder FROM registered_groups WHERE jid='tg:123456789';"
    ```
 
@@ -450,7 +450,7 @@ watch -n 5 'ps aux | grep "node dist"'
 # Bot responds with: Chat ID: tg:123456789
 
 # Verify in database
-sqlite3 store/agentforge.db \
+sqlite3 store/messages.db \
   "SELECT jid, name FROM chats ORDER BY last_message_time DESC LIMIT 10;"
 ```
 
@@ -481,13 +481,13 @@ LOG_LEVEL=debug sudo journalctl -u agentforge.service -f
 **Solution:**
 ```bash
 # Backup current database
-cp store/agentforge.db store/agentforge.db.backup
+cp store/messages.db store/messages.db.backup
 
 # Verify corruption
-sqlite3 store/agentforge.db "PRAGMA integrity_check;"
+sqlite3 store/messages.db "PRAGMA integrity_check;"
 
 # If corrupted, delete and restart
-rm store/agentforge.db
+rm store/messages.db
 
 # Service will recreate on next start
 sudo systemctl restart agentforge.service
@@ -516,7 +516,7 @@ sudo systemctl restart agentforge.service
 2. **Add database indexes:**
    ```bash
    # If messages table is huge, index by timestamp
-   sqlite3 store/agentforge.db "CREATE INDEX IF NOT EXISTS idx_chat_time ON messages(chat_jid, timestamp);"
+   sqlite3 store/messages.db "CREATE INDEX IF NOT EXISTS idx_chat_time ON messages(chat_jid, timestamp);"
    ```
 
 3. **Migrate to better database:**
@@ -534,7 +534,7 @@ LOG_LEVEL=debug npm start
 
 # Or via systemd
 sudo systemctl stop agentforge.service
-LOG_LEVEL=debug /home/dustin/agentforge/dist/index.js
+LOG_LEVEL=debug node dist/index.js
 
 # Or even more verbose
 LOG_LEVEL=trace npm start
@@ -577,19 +577,19 @@ grep -i "error\|exception" groups/main/logs/agent-*.log
 
 ```bash
 # List all tables
-sqlite3 store/agentforge.db ".schema"
+sqlite3 store/messages.db ".schema"
 
 # Check registered groups
-sqlite3 store/agentforge.db "SELECT * FROM registered_groups;"
+sqlite3 store/messages.db "SELECT * FROM registered_groups;"
 
 # Check active tasks
-sqlite3 store/agentforge.db "SELECT id, group_folder, next_run, status FROM scheduled_tasks WHERE status='active';"
+sqlite3 store/messages.db "SELECT id, group_folder, next_run, status FROM scheduled_tasks WHERE status='active';"
 
 # Count messages
-sqlite3 store/agentforge.db "SELECT chat_jid, COUNT(*) FROM messages GROUP BY chat_jid;"
+sqlite3 store/messages.db "SELECT chat_jid, COUNT(*) FROM messages GROUP BY chat_jid;"
 
 # Check router state
-sqlite3 store/agentforge.db "SELECT * FROM router_state;"
+sqlite3 store/messages.db "SELECT * FROM router_state;"
 ```
 
 ### Monitor resource usage

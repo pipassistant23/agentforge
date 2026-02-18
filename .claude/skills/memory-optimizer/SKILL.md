@@ -262,7 +262,7 @@ Detail here...
 **Fix:**
 1. Check QMD initialized:
    ```bash
-   ls /home/dustin/agentforge/data/qmd/main/qmd.db
+   ls data/qmd/main/qmd.db
    ```
 
 2. Manually initialize if needed:

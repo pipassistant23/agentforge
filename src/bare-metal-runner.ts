@@ -1,6 +1,12 @@
 /**
  * Bare Metal Runner for AgentForge
- * Spawns agent execution as Node.js processes (no containers)
+ *
+ * Spawns agent execution as Node.js processes (no containers).
+ * Each invocation gets its own process with a fresh environment,
+ * receives its prompt via stdin, and streams structured output via stdout.
+ *
+ * Output is delimited by sentinel markers so partial chunks can be
+ * accumulated and parsed without a framing protocol.
  */
 import { ChildProcess, spawn } from 'child_process';
 import fs from 'fs';
@@ -9,6 +15,7 @@ import path from 'path';
 import {
   AGENT_MAX_OUTPUT_SIZE,
   AGENT_TIMEOUT,
+  ASSISTANT_NAME,
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
@@ -21,6 +28,7 @@ import { RegisteredGroup } from './types.js';
 const OUTPUT_START_MARKER = '---AGENTFORGE_OUTPUT_START---';
 const OUTPUT_END_MARKER = '---AGENTFORGE_OUTPUT_END---';
 
+/** Input passed to the agent process via stdin as a JSON blob. */
 export interface AgentInput {
   prompt: string;
   sessionId?: string;
@@ -28,12 +36,16 @@ export interface AgentInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
+  /** API secrets injected transiently — never written to disk. */
   secrets?: Record<string, string>;
 }
 
+/** Structured result emitted by the agent process for each output event. */
 export interface AgentOutput {
   status: 'success' | 'error';
+  /** Text of the agent's response, or null for session-update markers. */
   result: string | null;
+  /** New Claude session ID, emitted after the first query initializes a session. */
   newSessionId?: string;
   error?: string;
   tokensIn?: number;
@@ -41,6 +53,7 @@ export interface AgentOutput {
   model?: string;
 }
 
+/** Minimal chat descriptor surfaced to the main group for group discovery. */
 export interface AvailableGroup {
   jid: string;
   name: string;
@@ -48,12 +61,27 @@ export interface AvailableGroup {
   isRegistered: boolean;
 }
 
+/**
+ * Load API credentials from the environment file.
+ * These are passed to the agent process via stdin rather than environment
+ * variables so they stay out of /proc and child process environments.
+ */
 function readSecrets(): Record<string, string> {
   return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
 }
 
 /**
- * Setup group session directory with Claude settings and skills
+ * Prepare the Claude session directory for a group, creating it if needed.
+ *
+ * Sets up:
+ * - `settings.json` enabling agent teams and memory features
+ * - Skills synced from the project-level `skills/` directory
+ * - Shared template files (SOUL.md, TOOLS.md) copied from `groups/global/`
+ * - Group-specific files (AGENTS.md, USER.md, memory.md) with defaults
+ * - Today's daily memory log at `memory/YYYY-MM-DD.md`
+ *
+ * @param group - The registered group whose session directory to set up
+ * @returns The path to the group's `.claude/` session directory
  */
 function setupGroupSession(group: RegisteredGroup): string {
   const groupSessionsDir = path.join(
@@ -156,7 +184,26 @@ function setupGroupSession(group: RegisteredGroup): string {
 }
 
 /**
- * Run agent as baremetal Node.js process
+ * Spawn an agent as a bare-metal Node.js subprocess and stream its output.
+ *
+ * The process lifecycle:
+ * 1. IPC and session directories are created for the group
+ * 2. The agent runner is spawned with a minimal, security-scoped environment
+ * 3. `AgentInput` (including transient API secrets) is written to stdin, then stdin is closed
+ * 4. stdout is parsed in real-time for OUTPUT_START/END marker pairs, each decoded
+ *    as an `AgentOutput` and forwarded to `onOutput`
+ * 5. A rolling timeout is reset on each output event; a process with no output
+ *    for `timeoutMs` is killed with SIGKILL
+ * 6. On close, the output promise chain is drained before resolving
+ *
+ * A timeout that fires after streaming output has started is treated as an idle
+ * cleanup (success), not a failure, because the agent already delivered its response.
+ *
+ * @param group - Registered group providing folder, name, and agent config
+ * @param input - Prompt, session, and context to pass to the agent
+ * @param onProcess - Callback to register the spawned process with the GroupQueue
+ * @param onOutput - Optional streaming callback for each parsed output chunk
+ * @returns Final `AgentOutput` summarising the run status
  */
 export async function runContainerAgent(
   group: RegisteredGroup,
@@ -184,7 +231,7 @@ export async function runContainerAgent(
     // Spawn agent as baremetal Node.js process
     const agentProcess = spawn(
       'node',
-      [path.join(process.cwd(), 'agent/agent-runner/dist/index.js')],
+      [path.join(process.cwd(), 'agent-runner-src/dist/index.js')],
       {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: path.join(GROUPS_DIR, group.folder),
@@ -194,6 +241,7 @@ export async function runContainerAgent(
           HOME: process.env.HOME,
           NODE_ENV: process.env.NODE_ENV,
           LOG_LEVEL: process.env.LOG_LEVEL,
+          ASSISTANT_NAME,
           AGENTFORGE_CHAT_JID: input.chatJid,
           AGENTFORGE_GROUP_FOLDER: input.groupFolder,
           AGENTFORGE_IS_MAIN: input.isMain ? '1' : '0',
@@ -263,9 +311,12 @@ export async function runContainerAgent(
     // Remove secrets from input so they don't appear in logs
     delete input.secrets;
 
-    // Streaming output: parse OUTPUT_START/END marker pairs as they arrive
+    // Streaming output: parse OUTPUT_START/END marker pairs as they arrive.
+    // parseBuffer accumulates raw stdout; complete JSON blobs between marker
+    // pairs are sliced out and decoded, with the remainder kept for the next chunk.
     let parseBuffer = '';
     let newSessionId: string | undefined;
+    // outputChain serializes async onOutput calls to prevent interleaving
     let outputChain = Promise.resolve();
     let hadStreamingOutput = false;
 
@@ -372,7 +423,11 @@ export async function runContainerAgent(
 
     let timeout = setTimeout(killOnTimeout, timeoutMs);
 
-    // Reset the timeout whenever there's activity (streaming output)
+    /**
+     * Reset the hard kill timer whenever streaming output is observed.
+     * This allows long-running multi-step agents to keep working as long
+     * as they are making progress; only true idle gaps trigger termination.
+     */
     const resetTimeout = () => {
       clearTimeout(timeout);
       timeout = setTimeout(killOnTimeout, timeoutMs);
@@ -536,6 +591,16 @@ export async function runContainerAgent(
   });
 }
 
+/**
+ * Write a snapshot of scheduled tasks to the group's IPC directory.
+ * The agent reads this file to display or manage tasks.
+ *
+ * Main group sees all tasks; other groups only see their own.
+ *
+ * @param groupFolder - Target group folder name
+ * @param isMain - Whether the group is the main orchestrator group
+ * @param tasks - Full task list; filtered here based on isMain
+ */
 export function writeTasksSnapshot(
   groupFolder: string,
   isMain: boolean,
@@ -564,8 +629,13 @@ export function writeTasksSnapshot(
 
 /**
  * Write available groups snapshot for the agent to read.
- * Only main group can see all available groups (for activation).
- * Non-main groups only see their own registration status.
+ * Only the main group can see all available groups (for activation).
+ * Non-main groups receive an empty list since they cannot register others.
+ *
+ * @param groupFolder - Target group folder name
+ * @param isMain - Whether the group is the main orchestrator group
+ * @param groups - Full list of known chats with registration status
+ * @param registeredJids - Set of JIDs currently registered as active groups
  */
 export function writeGroupsSnapshot(
   groupFolder: string,

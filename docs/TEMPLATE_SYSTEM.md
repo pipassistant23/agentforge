@@ -24,16 +24,14 @@ The template system provides a multi-layered approach to agent context and memor
 ```
 groups/
 ├── global/
-│   ├── CLAUDE.md          # Global instructions
-│   ├── AGENTS.md          # Global safety defaults
-│   ├── SOUL.md            # Shared identity
-│   └── TOOLS.md           # Shared tool notes
+│   ├── AGENTS.md          # Global operational guidelines (non-main groups)
+│   ├── SOUL.md            # Shared identity template
+│   └── TOOLS.md           # Shared tool reference template
 │
 └── main/  (or any group)
-    ├── CLAUDE.md          # Group-specific capabilities
-    ├── AGENTS.md          # (Copied from global/)
-    ├── SOUL.md            # (Copied from global/)
-    ├── TOOLS.md           # (Copied from global/)
+    ├── AGENTS.md          # Group-specific operational guidelines (primary instruction file)
+    ├── SOUL.md            # (Synced from global/ on each agent startup)
+    ├── TOOLS.md           # (Synced from global/ on each agent startup)
     ├── USER.md            # User preferences for this group
     ├── memory.md          # Long-term facts for this group
     └── memory/
@@ -56,7 +54,7 @@ When an agent starts, it should read (in order):
 6. `memory/YYYY-MM-DD.md` - Read today's log (if exists)
 7. `memory/YYYY-MM-DD.md` - Read yesterday's log (if exists)
 
-This is documented in the "Session Startup" section of `CLAUDE.md`.
+This is documented in the "Session Startup" section of `AGENTS.md`.
 
 ### During Operation
 
@@ -67,8 +65,9 @@ This is documented in the "Session Startup" section of `CLAUDE.md`.
 ### Automatic Management
 
 The `setupGroupSession()` function in `bare-metal-runner.ts`:
-- Syncs `AGENTS.md`, `SOUL.md`, `TOOLS.md` from `groups/global/` to each group
-- Ensures `USER.md` and `memory.md` exist (creates with defaults if missing)
+- Syncs `SOUL.md` and `TOOLS.md` from `groups/global/` to each group on every agent startup
+- Does **not** sync `AGENTS.md` — it is group-specific and managed per group
+- Ensures `AGENTS.md`, `USER.md`, and `memory.md` exist in each group workspace (creates with defaults if missing)
 - Initializes today's memory log if it doesn't exist
 
 ## Memory System
@@ -95,40 +94,30 @@ The agent reads today + yesterday for recent continuity (2-day sliding window).
 
 Update strategy: Promote facts from daily logs when patterns are confirmed.
 
-### CLAUDE.md
+### AGENTS.md
 
-Remains the primary instruction file for Claude Code:
-- Group-specific capabilities and tools
-- Instructions on what the agent can do
-- Loaded by Claude Code's `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD` feature
+The primary instruction file loaded by the agent runner:
+- Combined from `groups/global/AGENTS.md` (for non-main groups) and `groups/{group}/AGENTS.md`
+- Passed to the Claude SDK as a `systemPrompt.append` value
+- Template variables (e.g., `{{ASSISTANT_NAME}}`) are substituted before loading
+- Keep concise (~500 tokens max per file) — move details to `memory/` topic files
 
 ## Utilities
 
-The `src/memory-manager.ts` module provides:
+Memory log initialization is handled automatically by `setupGroupSession()` in `src/bare-metal-runner.ts`. It creates today's daily memory log file (`groups/{folder}/memory/YYYY-MM-DD.md`) if it does not already exist.
 
-```typescript
-import {
-  getTodaysMemoryPath,
-  getYesterdaysMemoryPath,
-  initTodaysMemoryLog,
-  appendToTodaysMemory,
-  readTodaysMemory,
-  readYesterdaysMemory,
-  getMemoryContext,
-  cleanupOldMemoryLogs,
-} from './memory-manager.js';
+Agents read and write to memory files directly using standard file tools (Read, Write, Edit). The expected daily log format is:
 
-// Initialize today's log
-initTodaysMemoryLog('main');
+```markdown
+# YYYY-MM-DD
 
-// Append an entry
-appendToTodaysMemory('main', 'User requested weather forecast feature');
+## Summary
 
-// Read memory for session startup
-const { today, yesterday } = getMemoryContext('main');
+(Daily summary - updated throughout the day)
 
-// Clean up old logs (keep last 30 days)
-cleanupOldMemoryLogs('main', 30);
+## Conversations
+
+(Conversation notes appended during the day)
 ```
 
 ## Customization
@@ -137,9 +126,11 @@ cleanupOldMemoryLogs('main', 30);
 
 To customize templates for a specific group:
 
-1. Edit `groups/{groupFolder}/AGENTS.md` (will be overwritten on sync)
+1. Edit `groups/{groupFolder}/AGENTS.md` (persistent — not overwritten by global sync)
 2. Edit `groups/{groupFolder}/USER.md` (persistent, never overwritten)
 3. Edit `groups/{groupFolder}/memory.md` (persistent, never overwritten)
+
+Note: `SOUL.md` and `TOOLS.md` in each group are overwritten on every agent startup from the global templates. Do not make per-group edits to those files — edit the global versions instead.
 
 ### Global Templates
 
@@ -157,16 +148,7 @@ These are synced to each group on agent startup.
 2. **Structure** - Clear separation of concerns (identity, safety, memory, instructions)
 3. **Scalability** - Template system works for single or multiple groups
 4. **Git-friendly** - All files are markdown and can be versioned
-5. **Compatibility** - Works alongside existing CLAUDE.md system
-
-## Migration from CLAUDE.md Only
-
-The template system is additive:
-- Existing `CLAUDE.md` files continue to work
-- New template files provide additional structure
-- No breaking changes to current functionality
-
-Agents are encouraged to read all template files at session start, but falling back to just `CLAUDE.md` still works.
+5. **Maintainability** - Global templates (`SOUL.md`, `TOOLS.md`) stay consistent across groups via automatic sync
 
 ## Future Enhancements
 

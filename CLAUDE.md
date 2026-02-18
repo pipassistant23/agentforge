@@ -69,7 +69,7 @@ sudo journalctl -u agentforge.service -f    # Follow logs
 sudo systemctl enable agentforge.service    # Enable on boot
 ```
 
-Environment variables loaded from `/home/dustin/agentforge/.env` via EnvironmentFile directive.
+Environment variables loaded from the project root `.env` file via EnvironmentFile directive.
 
 ## Agent Execution
 

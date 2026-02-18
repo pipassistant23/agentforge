@@ -1,3 +1,12 @@
+/**
+ * AgentForge Orchestrator
+ *
+ * Central coordinator that:
+ * - Connects to Telegram and routes incoming messages to agent processes
+ * - Maintains per-group cursors so agents only see new messages
+ * - Queues work through GroupQueue to serialize per-group agent invocations
+ * - Delegates long-running work to bare-metal Node.js subprocesses
+ */
 import fs from 'fs';
 import path from 'path';
 
@@ -40,18 +49,44 @@ import { startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 
-// Re-export for backwards compatibility during refactor
-export { escapeXml, formatMessages } from './router.js';
-
+/**
+ * ISO timestamp of the last message seen across all groups.
+ * Used to poll only new messages from the DB on each loop tick.
+ */
 let lastTimestamp = '';
+
+/**
+ * Active Claude session IDs keyed by group folder name.
+ * Persisted to SQLite so sessions survive restarts.
+ */
 let sessions: Record<string, string> = {};
+
+/**
+ * All groups that have been activated and should receive agent responses.
+ * Keyed by the chat JID (e.g. "tg:-1001234567890").
+ */
 let registeredGroups: Record<string, RegisteredGroup> = {};
+
+/**
+ * Per-group cursor tracking the last message that was handed off to an agent.
+ * Separate from lastTimestamp so the agent can catch up missed messages
+ * independently from the "seen" cursor that prevents double-processing.
+ */
 let lastAgentTimestamp: Record<string, string> = {};
+
+/** Prevents startMessageLoop from being called more than once. */
 let messageLoopRunning = false;
 
+/** All connected messaging channels (currently just Telegram). */
 const channels: Channel[] = [];
+
+/** Serializes agent invocations so each group has at most one active process. */
 const queue = new GroupQueue();
 
+/**
+ * Restore persisted state from the SQLite database on startup.
+ * Loads timestamps, session IDs, and registered group definitions.
+ */
 function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
   const agentTs = getRouterState('last_agent_timestamp');
@@ -69,11 +104,22 @@ function loadState(): void {
   );
 }
 
+/**
+ * Persist the message-seen and agent-processed cursors to the DB.
+ * Called after advancing either cursor so crashes don't replay messages.
+ */
 function saveState(): void {
   setRouterState('last_timestamp', lastTimestamp);
   setRouterState('last_agent_timestamp', JSON.stringify(lastAgentTimestamp));
 }
 
+/**
+ * Activate a chat JID so the agent starts responding to it.
+ * Creates the group's workspace directory tree and persists the registration.
+ *
+ * @param jid - Chat JID (e.g. "tg:-1001234567890")
+ * @param group - Group metadata including folder name and trigger pattern
+ */
 function registerGroup(jid: string, group: RegisteredGroup): void {
   registeredGroups[jid] = group;
   setRegisteredGroup(jid, group);
@@ -91,6 +137,10 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
 /**
  * Get available groups list for the agent.
  * Returns groups ordered by most recent activity.
+ *
+ * Filters out internal sync markers and includes both WhatsApp groups
+ * and Telegram chats. The main group uses this list to discover and
+ * activate new groups via the register_group IPC action.
  */
 export function getAvailableGroups(): import('./bare-metal-runner.js').AvailableGroup[] {
   const chats = getAllChats();
@@ -120,6 +170,16 @@ export function _setRegisteredGroups(
 /**
  * Process all pending messages for a group.
  * Called by the GroupQueue when it's this group's turn.
+ *
+ * Handles the full lifecycle of a single agent invocation:
+ * 1. Fetches messages since the last agent-processed timestamp
+ * 2. Checks trigger requirements for non-main groups
+ * 3. Runs the agent process and streams results back to the channel
+ * 4. Manages cursor advancement and rollback on error
+ *
+ * @param chatJid - The JID of the group to process
+ * @returns true if processing succeeded (or was a no-op), false if the agent
+ *          errored and the caller should retry
  */
 async function processGroupMessages(chatJid: string): Promise<boolean> {
   const group = registeredGroups[chatJid];
@@ -165,6 +225,11 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   // Track idle timer for closing stdin when agent is idle
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /**
+   * Reset the idle countdown after each chunk of agent output.
+   * When the timer fires, stdin is closed to signal the agent to exit
+   * rather than waiting indefinitely for more IPC messages.
+   */
   const resetIdleTimer = () => {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
@@ -238,6 +303,19 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Prepare context snapshots and invoke the bare-metal agent process.
+ *
+ * Writes tasks and available-groups snapshots to the group's IPC directory
+ * so the agent can read them as files. Wraps the onOutput callback to
+ * capture and persist new session IDs as they arrive in the stream.
+ *
+ * @param group - The registered group configuration
+ * @param prompt - XML-formatted message string to send to the agent
+ * @param chatJid - Chat JID used to register the spawned process with the queue
+ * @param onOutput - Optional streaming callback invoked for each agent output chunk
+ * @returns 'success' or 'error' based on process exit status
+ */
 async function runAgent(
   group: RegisteredGroup,
   prompt: string,
@@ -318,6 +396,18 @@ async function runAgent(
   }
 }
 
+/**
+ * Main polling loop that drives message delivery to agents.
+ *
+ * On each tick:
+ * 1. Fetches new messages across all registered groups
+ * 2. Advances the global "seen" cursor immediately to prevent double-processing
+ * 3. For each group with new messages, either pipes them to an already-running
+ *    process (via GroupQueue.sendMessage) or enqueues a new processGroupMessages call
+ *
+ * Non-trigger messages accumulate in the DB and are included as context when
+ * a trigger eventually arrives, giving the agent full conversation history.
+ */
 async function startMessageLoop(): Promise<void> {
   if (messageLoopRunning) {
     logger.debug('Message loop already running, skipping duplicate start');
@@ -408,7 +498,8 @@ async function startMessageLoop(): Promise<void> {
 
 /**
  * Startup recovery: check for unprocessed messages in registered groups.
- * Handles crash between advancing lastTimestamp and processing messages.
+ * Handles the crash window between advancing lastTimestamp and the agent
+ * finishing its run — without this, those messages would be silently dropped.
  */
 function recoverPendingMessages(): void {
   for (const [chatJid, group] of Object.entries(registeredGroups)) {
@@ -424,17 +515,13 @@ function recoverPendingMessages(): void {
   }
 }
 
-function ensureContainerSystemRunning(): void {
-  // Legacy function - kept for backwards compatibility during transition
-  // Baremetal mode doesn't require any container system
-  logger.debug('Running in baremetal mode - no container system required');
-}
-
+/**
+ * Application entry point.
+ *
+ * Initializes the database, restores state, connects to Telegram,
+ * then starts the IPC watcher, task scheduler, and message loop.
+ */
 async function main(): Promise<void> {
-  // Skip container check for baremetal deployments
-  if (process.env.SKIP_CONTAINER_CHECK !== 'true') {
-    ensureContainerSystemRunning();
-  }
   initDatabase();
   logger.info('Database initialized');
   loadState();

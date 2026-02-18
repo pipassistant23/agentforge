@@ -98,8 +98,8 @@ cd ..
 After building, verify the output exists:
 
 ```bash
-ls dist/index.js               # Main orchestrator
-ls agent/agent-runner/dist/index.js   # Agent runner
+ls dist/index.js                       # Main orchestrator
+ls agent-runner-src/dist/index.js      # Agent runner
 ```
 
 ### Step 4: Create the Environment File
@@ -141,13 +141,15 @@ mkdir -p store
 
 ### Step 6: Set Up the Global Agent Instructions
 
-The file `groups/global/CLAUDE.md` contains instructions shared across all agent groups. A default version is included in the repository. Review it and customize as needed:
+The file `groups/global/AGENTS.md` contains operational guidelines shared across all agent groups. The files `groups/global/SOUL.md` and `groups/global/TOOLS.md` contain identity and tool reference templates. A default version of each is included in the repository. Review and customize as needed:
 
 ```bash
-nano groups/global/CLAUDE.md
+nano groups/global/AGENTS.md
+nano groups/global/SOUL.md
+nano groups/global/TOOLS.md
 ```
 
-If it contains template variables like `{{ASSISTANT_NAME}}`, they are substituted automatically at runtime using the value from your `.env` file.
+If these files contain template variables like `{{ASSISTANT_NAME}}`, they are substituted automatically at runtime using the value from your `.env` file.
 
 ---
 

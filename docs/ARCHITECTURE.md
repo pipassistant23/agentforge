@@ -26,7 +26,7 @@ AgentForge is a single Node.js process that bridges Telegram and the Claude Agen
                           │  GroupQueue (per-group serialization)                │
                           │       │  max 5 concurrent processes                   │
                           │       ▼                                               │
-                          │  runContainerAgent()  ─────────────────────────────► │
+                          │  runContainerAgent()  ──────────────────────────────► │
                           │       │                                               │
                           └───────┼───────────────────────────────────────────── ┘
                                   │ spawn(node agent-runner)
@@ -90,7 +90,7 @@ Wraps the [grammy](https://grammy.dev/) library and implements the `Channel` int
 
 Spawns agent processes and manages their lifecycle:
 
-- **Process spawn**: Calls `spawn('node', ['agent/agent-runner/dist/index.js'])` with environment variables pointing to the group's workspace and IPC directories.
+- **Process spawn**: Calls `spawn('node', ['agent-runner-src/dist/index.js'])` with environment variables pointing to the group's workspace and IPC directories.
 - **Secrets delivery**: Reads API keys from `.env` and passes them via `stdin` as JSON (never via environment variables, to prevent leaking to child processes).
 - **Session management**: Sets up `.claude/settings.json` per group with SDK feature flags.
 - **Skills sync**: Copies skill files from `skills/` into each group's session directory.
@@ -294,11 +294,16 @@ Each group gets its own working directory:
 | Path | Purpose |
 |------|---------|
 | `groups/{folder}/` | Agent's working directory (cwd) |
-| `groups/{folder}/CLAUDE.md` | Group-specific memory and instructions |
+| `groups/{folder}/AGENTS.md` | Group-specific operational guidelines (primary instruction file) |
+| `groups/{folder}/SOUL.md` | Identity and behavioral boundaries (synced from global) |
+| `groups/{folder}/TOOLS.md` | Environment and tool reference (synced from global) |
+| `groups/{folder}/USER.md` | User preferences for this group |
+| `groups/{folder}/memory.md` | Long-term facts and patterns |
+| `groups/{folder}/memory/` | Daily conversation logs (`YYYY-MM-DD.md`) |
 | `groups/{folder}/logs/` | Per-run agent execution logs |
-| `groups/{folder}/conversations/` | Archived conversation transcripts |
-| `groups/{folder}/memory/` | Long-term memory files |
-| `groups/global/CLAUDE.md` | Shared instructions (all non-main groups) |
+| `groups/global/AGENTS.md` | Shared operational guidelines (non-main groups) |
+| `groups/global/SOUL.md` | Shared identity template |
+| `groups/global/TOOLS.md` | Shared tool reference template |
 | `data/ipc/{folder}/` | IPC directories |
 | `data/sessions/{folder}/.claude/` | SDK session files and settings |
 

@@ -1,17 +1,21 @@
 /**
  * AgentForge Agent Runner
- * Runs as baremetal Node.js process, receives config via stdin, outputs result to stdout
+ *
+ * Runs as a bare-metal Node.js process. Receives its configuration and initial
+ * prompt via stdin (as a JSON blob), then enters a query loop that drives the
+ * Claude Agent SDK. Results are streamed back to the host via stdout using
+ * sentinel-delimited JSON blocks.
  *
  * Input protocol:
- *   Stdin: Full ContainerInput JSON (read until EOF, like before)
- *   IPC:   Follow-up messages written as JSON files to /workspace/ipc/input/
+ *   Stdin: Full ContainerInput JSON (read until EOF)
+ *   IPC:   Follow-up messages written as JSON files to WORKSPACE_IPC/input/
  *          Files: {type:"message", text:"..."}.json — polled and consumed
- *          Sentinel: /workspace/ipc/input/_close — signals session end
+ *          Sentinel: WORKSPACE_IPC/input/_close — signals session end
  *
  * Stdout protocol:
  *   Each result is wrapped in OUTPUT_START_MARKER / OUTPUT_END_MARKER pairs.
- *   Multiple results may be emitted (one per agent teams result).
- *   Final marker after loop ends signals completion.
+ *   Multiple results may be emitted (one per agent result event).
+ *   The host's bare-metal-runner parses these pairs in real-time.
  */
 
 import fs from 'fs';
@@ -26,6 +30,7 @@ import { fileURLToPath } from 'url';
 import { initializeQMD, getQMDEnvironment } from './qmd-setup.js';
 import { substituteVariables } from './template.js';
 
+/** Full input payload received from the host via stdin. */
 interface ContainerInput {
   prompt: string;
   sessionId?: string;
@@ -33,9 +38,11 @@ interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
+  /** API credentials passed transiently — never written to disk. */
   secrets?: Record<string, string>;
 }
 
+/** Structured output block emitted to stdout for each SDK result event. */
 interface ContainerOutput {
   status: 'success' | 'error';
   result: string | null;
@@ -43,6 +50,7 @@ interface ContainerOutput {
   error?: string;
 }
 
+/** Single entry in the Claude sessions index file. */
 interface SessionEntry {
   sessionId: string;
   fullPath: string;
@@ -50,10 +58,12 @@ interface SessionEntry {
   firstPrompt: string;
 }
 
+/** Structure of the sessions-index.json file maintained by the Claude SDK. */
 interface SessionsIndex {
   entries: SessionEntry[];
 }
 
+/** Shape of a user turn message as expected by the Claude Agent SDK. */
 interface SDKUserMessage {
   type: 'user';
   message: { role: 'user'; content: string };
@@ -73,13 +83,20 @@ const IPC_POLL_MS = 500;
 
 /**
  * Push-based async iterable for streaming user messages to the SDK.
- * Keeps the iterable alive until end() is called, preventing isSingleUserTurn.
+ *
+ * Keeps the async iterator alive until `end()` is called, which prevents
+ * the SDK from treating the interaction as a single-turn exchange.
+ * New messages can be pushed at any time (e.g., from IPC files).
+ *
+ * The `waiting` callback is a one-shot resolver: when a message is pushed
+ * or the stream ends, the pending `await` in the iterator unblocks.
  */
 class MessageStream {
   private queue: SDKUserMessage[] = [];
   private waiting: (() => void) | null = null;
   private done = false;
 
+  /** Enqueue a user message for delivery to the SDK. */
   push(text: string): void {
     this.queue.push({
       type: 'user',
@@ -90,6 +107,7 @@ class MessageStream {
     this.waiting?.();
   }
 
+  /** Signal that no further messages will arrive; the iterator will exit after draining. */
   end(): void {
     this.done = true;
     this.waiting?.();
@@ -109,6 +127,10 @@ class MessageStream {
   }
 }
 
+/**
+ * Read all stdin until EOF and return it as a string.
+ * Used to receive the full ContainerInput JSON from the host process.
+ */
 async function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -124,16 +146,36 @@ async function readStdin(): Promise<string> {
 const OUTPUT_START_MARKER = '---AGENTFORGE_OUTPUT_START---';
 const OUTPUT_END_MARKER = '---AGENTFORGE_OUTPUT_END---';
 
+/**
+ * Write a structured output block to stdout.
+ * The host's bare-metal-runner scans stdout for these marker pairs and parses
+ * the JSON between them, so the format must match exactly.
+ *
+ * @param output - The result payload to serialize and emit
+ */
 function writeOutput(output: ContainerOutput): void {
   console.log(OUTPUT_START_MARKER);
   console.log(JSON.stringify(output));
   console.log(OUTPUT_END_MARKER);
 }
 
+/**
+ * Write a debug message to stderr (forwarded to the host logger as debug lines).
+ *
+ * @param message - The log message to emit
+ */
 function log(message: string): void {
   console.error(`[agent-runner] ${message}`);
 }
 
+/**
+ * Look up a session's summary from the SDK's sessions-index.json.
+ * Used to derive a human-readable filename when archiving a conversation.
+ *
+ * @param sessionId - The Claude session ID to look up
+ * @param transcriptPath - Path to the current session's transcript file
+ * @returns The session summary string, or null if not found
+ */
 function getSessionSummary(
   sessionId: string,
   transcriptPath: string,
@@ -164,8 +206,13 @@ function getSessionSummary(
 }
 
 /**
- * Archive the full transcript to conversations/ before compaction.
- * Memory flush happens automatically via SDK's compaction.memoryFlush config.
+ * Create a pre-compact hook that archives the full conversation transcript
+ * to `conversations/YYYY-MM-DD-{summary}.md` before the SDK compacts it.
+ *
+ * Compaction discards old messages to stay within context limits; archiving
+ * first gives the agent (and user) a permanent record of every exchange.
+ * Memory flush (writing key facts to memory.md) happens via a threshold-based
+ * message injection in `runQuery`, not here.
  */
 function createPreCompactHook(): HookCallback {
   return async (input, _toolUseId, _context) => {
@@ -215,9 +262,16 @@ function createPreCompactHook(): HookCallback {
 
 // Secrets to strip from Bash tool subprocess environments.
 // These are needed by claude-code for API auth but should never
-// be visible to commands Kit runs.
+// be visible to commands the agent runs.
 const SECRET_ENV_VARS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
 
+/**
+ * Create a pre-tool-use hook that strips API secrets from Bash command environments.
+ *
+ * The SDK needs the secrets to make API calls, but they should never leak into
+ * shell commands the agent executes. The hook prepends `unset` to every Bash
+ * command, clearing the variables before the command body runs.
+ */
 function createSanitizeBashHook(): HookCallback {
   return async (input, _toolUseId, _context) => {
     const preInput = input as PreToolUseHookInput;
@@ -237,6 +291,13 @@ function createSanitizeBashHook(): HookCallback {
   };
 }
 
+/**
+ * Convert a session summary to a filesystem-safe filename fragment.
+ * Lowercases, replaces non-alphanumeric runs with hyphens, and truncates to 50 chars.
+ *
+ * @param summary - The human-readable session summary
+ * @returns A sanitized string safe for use in a filename
+ */
 function sanitizeFilename(summary: string): string {
   return summary
     .toLowerCase()
@@ -245,16 +306,28 @@ function sanitizeFilename(summary: string): string {
     .slice(0, 50);
 }
 
+/**
+ * Generate a time-based fallback filename when no session summary is available.
+ * Format: `conversation-HHMM`
+ */
 function generateFallbackName(): string {
   const time = new Date();
   return `conversation-${time.getHours().toString().padStart(2, '0')}${time.getMinutes().toString().padStart(2, '0')}`;
 }
 
+/** A parsed user or assistant message extracted from a JSONL transcript. */
 interface ParsedMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
+/**
+ * Parse a Claude session transcript (JSONL format) into user/assistant message pairs.
+ * Only text-type content parts are extracted; tool calls and other content types are ignored.
+ *
+ * @param content - Raw JSONL transcript file contents
+ * @returns Ordered list of parsed messages; empty if the transcript is malformed
+ */
 function parseTranscript(content: string): ParsedMessage[] {
   const messages: ParsedMessage[] = [];
 
@@ -283,6 +356,14 @@ function parseTranscript(content: string): ParsedMessage[] {
   return messages;
 }
 
+/**
+ * Format a list of parsed messages as a Markdown conversation archive.
+ * Message content is truncated at 2000 characters to keep archive files readable.
+ *
+ * @param messages - Ordered message list from `parseTranscript`
+ * @param title - Optional conversation title (from session summary); defaults to "Conversation"
+ * @returns Markdown string ready to write to disk
+ */
 function formatTranscriptMarkdown(
   messages: ParsedMessage[],
   title?: string | null,
@@ -321,7 +402,10 @@ function formatTranscriptMarkdown(
 }
 
 /**
- * Check for _close sentinel.
+ * Check for the `_close` sentinel file and delete it if present.
+ * The host writes this file to signal the agent should exit cleanly.
+ *
+ * @returns true if the sentinel was found (and removed)
  */
 function shouldClose(): boolean {
   if (fs.existsSync(IPC_INPUT_CLOSE_SENTINEL)) {
@@ -336,8 +420,10 @@ function shouldClose(): boolean {
 }
 
 /**
- * Drain all pending IPC input messages.
- * Returns messages found, or empty array.
+ * Read and delete all pending JSON message files from the IPC input directory.
+ * Files are sorted before processing to preserve delivery order.
+ *
+ * @returns Array of message text strings (may be empty)
  */
 function drainIpcInput(): string[] {
   try {
@@ -375,8 +461,13 @@ function drainIpcInput(): string[] {
 }
 
 /**
- * Wait for a new IPC message or _close sentinel.
- * Returns the messages as a single string, or null if _close.
+ * Poll the IPC input directory until a message or `_close` sentinel arrives.
+ *
+ * Used between query loops: after the SDK finishes a query, the runner waits
+ * here for the next user message before starting a new query in the same session.
+ * The host closes stdin (and later writes _close) to terminate this wait.
+ *
+ * @returns The next message text, or null if `_close` was received
  */
 function waitForIpcMessage(): Promise<string | null> {
   return new Promise((resolve) => {
@@ -397,10 +488,26 @@ function waitForIpcMessage(): Promise<string | null> {
 }
 
 /**
- * Run a single query and stream results via writeOutput.
- * Uses MessageStream (AsyncIterable) to keep isSingleUserTurn=false,
- * allowing agent teams subagents to run to completion.
- * Also pipes IPC messages into the stream during the query.
+ * Run a single SDK query and stream results via `writeOutput`.
+ *
+ * Uses a `MessageStream` (AsyncIterable) to keep `isSingleUserTurn=false`,
+ * which allows agent-teams subagents to spawn and complete. While the query
+ * is running, a parallel IPC poll loop pipes any new messages into the stream
+ * or ends it if `_close` is detected.
+ *
+ * After the threshold number of messages, a memory flush reminder is injected
+ * into the stream so the agent saves key facts before the context window fills.
+ *
+ * AGENTS.md files are loaded fresh on each query call so configuration changes
+ * take effect without a process restart.
+ *
+ * @param prompt - The initial user message for this query
+ * @param sessionId - Claude session ID to resume, or undefined for a new session
+ * @param mcpServerPath - Absolute path to the IPC MCP server script
+ * @param containerInput - Full input context (group, JID, isMain flags)
+ * @param sdkEnv - Environment variables passed to the SDK (includes injected secrets)
+ * @param resumeAt - UUID of the last assistant message to resume from, if resuming mid-session
+ * @returns Session tracking info and whether `_close` was consumed during the query
  */
 async function runQuery(
   prompt: string,
@@ -417,7 +524,8 @@ async function runQuery(
   const stream = new MessageStream();
   stream.push(prompt);
 
-  // Poll IPC for follow-up messages and _close sentinel during the query
+  // Poll IPC for follow-up messages and _close sentinel during the query.
+  // Messages get piped into the stream so the agent can respond without a new process.
   let ipcPolling = true;
   let closedDuringQuery = false;
   const pollIpcDuringQuery = () => {
@@ -445,8 +553,8 @@ async function runQuery(
   let memoryFlushTriggered = false;
   const MEMORY_FLUSH_MESSAGE_THRESHOLD = 40; // Trigger after 40 messages
 
-  // Load and process AGENTS.md files with template variable substitution
-  // Global AGENTS.md (shared across all groups)
+  // Load and process AGENTS.md files with template variable substitution.
+  // Global AGENTS.md applies to all non-main groups (shared identity/behavior).
   const globalAgentsMdPath = path.join(WORKSPACE_GLOBAL, 'AGENTS.md');
   let globalAgentsMd: string | undefined;
   if (!containerInput.isMain && fs.existsSync(globalAgentsMdPath)) {
@@ -454,7 +562,7 @@ async function runQuery(
     globalAgentsMd = substituteVariables(rawContent);
   }
 
-  // Group AGENTS.md (specific to this group)
+  // Group AGENTS.md provides group-specific instructions
   const groupAgentsMdPath = path.join(WORKSPACE_GROUP, 'AGENTS.md');
   let groupAgentsMd: string | undefined;
   if (fs.existsSync(groupAgentsMdPath)) {
@@ -467,8 +575,8 @@ async function runQuery(
     .filter(Boolean)
     .join('\n\n---\n\n');
 
-  // Discover additional directories mounted at extra workspace
-  // These are passed to the SDK for additional context
+  // Discover additional directories mounted at extra workspace.
+  // These are passed to the SDK for additional context (e.g., shared resources).
   const extraDirs: string[] = [];
   if (fs.existsSync(WORKSPACE_EXTRA)) {
     for (const entry of fs.readdirSync(WORKSPACE_EXTRA)) {
@@ -527,9 +635,9 @@ async function runQuery(
           command: 'node',
           args: [mcpServerPath],
           env: {
-            PIPBOT_CHAT_JID: containerInput.chatJid,
-            PIPBOT_GROUP_FOLDER: containerInput.groupFolder,
-            PIPBOT_IS_MAIN: containerInput.isMain ? '1' : '0',
+            AGENTFORGE_CHAT_JID: containerInput.chatJid,
+            AGENTFORGE_GROUP_FOLDER: containerInput.groupFolder,
+            AGENTFORGE_IS_MAIN: containerInput.isMain ? '1' : '0',
           },
         },
         qmd: {
@@ -557,7 +665,8 @@ async function runQuery(
         : message.type;
     log(`[msg #${messageCount}] type=${msgType}`);
 
-    // Trigger memory flush after threshold (once per session)
+    // Inject a memory flush reminder after hitting the message threshold (once per query).
+    // This prompts the agent to save key facts to memory.md before the context fills.
     if (
       !memoryFlushTriggered &&
       messageCount >= MEMORY_FLUSH_MESSAGE_THRESHOLD
@@ -625,6 +734,18 @@ After saving, reply with "Memory updated" or continue our conversation naturally
   return { newSessionId, lastAssistantUuid, closedDuringQuery };
 }
 
+/**
+ * Agent runner entry point.
+ *
+ * 1. Reads ContainerInput JSON from stdin
+ * 2. Injects API secrets into a sandboxed SDK environment
+ * 3. Initializes QMD memory system for the group
+ * 4. Enters the query loop:
+ *    - Runs the initial prompt
+ *    - Emits a session-update marker after each query completes
+ *    - Waits for the next IPC message or `_close` sentinel
+ *    - Repeats until closed or an unrecoverable error occurs
+ */
 async function main(): Promise<void> {
   let containerInput: ContainerInput;
 
@@ -674,14 +795,15 @@ async function main(): Promise<void> {
   let sessionId = containerInput.sessionId;
   fs.mkdirSync(IPC_INPUT_DIR, { recursive: true });
 
-  // Clean up stale _close sentinel from previous container runs
+  // Clean up stale _close sentinel from previous runs to avoid premature exit
   try {
     fs.unlinkSync(IPC_INPUT_CLOSE_SENTINEL);
   } catch {
     /* ignore */
   }
 
-  // Build initial prompt (drain any pending IPC messages too)
+  // Build initial prompt, prepending context for scheduled tasks.
+  // Also drain any IPC messages that arrived before the process started.
   let prompt = containerInput.prompt;
   if (containerInput.isScheduledTask) {
     prompt = `[SCHEDULED TASK - The following message was sent automatically and is not coming directly from the user or group.]\n\n${prompt}`;
@@ -692,7 +814,9 @@ async function main(): Promise<void> {
     prompt += '\n' + pending.join('\n');
   }
 
-  // Query loop: run query → wait for IPC message → run new query → repeat
+  // Query loop: run query → wait for IPC message → run new query → repeat.
+  // resumeAt tracks the last assistant message UUID so each successive query
+  // can resume from exactly where the previous one left off.
   let resumeAt: string | undefined;
   try {
     while (true) {
@@ -715,15 +839,14 @@ async function main(): Promise<void> {
         resumeAt = queryResult.lastAssistantUuid;
       }
 
-      // If _close was consumed during the query, exit immediately.
-      // Don't emit a session-update marker (it would reset the host's
-      // idle timer and cause a 30-min delay before the next _close).
+      // If _close was consumed during the query, exit immediately without emitting
+      // a session-update marker — that would reset the host's idle timer.
       if (queryResult.closedDuringQuery) {
         log('Close sentinel consumed during query, exiting');
         break;
       }
 
-      // Emit session update so host can track it
+      // Emit a session-update marker so the host can persist the new session ID
       writeOutput({ status: 'success', result: null, newSessionId: sessionId });
 
       log('Query ended, waiting for next IPC message...');

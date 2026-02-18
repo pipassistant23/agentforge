@@ -1,3 +1,17 @@
+/**
+ * SQLite database layer for AgentForge.
+ *
+ * Manages all persistent state:
+ * - Chat metadata (discovery, last activity)
+ * - Message history (for agent context)
+ * - Scheduled tasks and run logs
+ * - Router state (polling cursors)
+ * - Claude session IDs (per-group conversation continuity)
+ * - Registered group definitions
+ *
+ * Uses better-sqlite3 for synchronous access — all reads and writes
+ * are blocking and happen on the main thread alongside the event loop.
+ */
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
@@ -12,6 +26,13 @@ import {
 
 let db: Database.Database;
 
+/**
+ * Create all tables and indexes if they don't exist.
+ * Also runs inline migrations for columns added after the initial release,
+ * using try/catch to silently skip columns that already exist.
+ *
+ * @param database - The better-sqlite3 database instance to initialize
+ */
 function createSchema(database: Database.Database): void {
   database.exec(`
     CREATE TABLE IF NOT EXISTS chats (
@@ -103,6 +124,11 @@ function createSchema(database: Database.Database): void {
   }
 }
 
+/**
+ * Initialize the SQLite database at the configured path.
+ * Creates the store directory if needed, then runs schema creation and
+ * migrates any legacy JSON state files to the database.
+ */
 export function initDatabase(): void {
   const dbPath = path.join(STORE_DIR, 'messages.db');
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -123,6 +149,13 @@ export function _initTestDatabase(): void {
 /**
  * Store chat metadata only (no message content).
  * Used for all chats to enable group discovery without storing sensitive content.
+ *
+ * Uses MAX() on last_message_time to avoid regressing a newer timestamp
+ * if an older event arrives out of order.
+ *
+ * @param chatJid - The chat's unique identifier
+ * @param timestamp - ISO timestamp of the most recent activity in this chat
+ * @param name - Optional display name; preserved from previous record if omitted
  */
 export function storeChatMetadata(
   chatJid: string,
@@ -151,20 +184,7 @@ export function storeChatMetadata(
   }
 }
 
-/**
- * Update chat name without changing timestamp for existing chats.
- * New chats get the current time as their initial timestamp.
- * Used during group metadata sync.
- */
-export function updateChatName(chatJid: string, name: string): void {
-  db.prepare(
-    `
-    INSERT INTO chats (jid, name, last_message_time) VALUES (?, ?, ?)
-    ON CONFLICT(jid) DO UPDATE SET name = excluded.name
-  `,
-  ).run(chatJid, name, new Date().toISOString());
-}
-
+/** Shape of a row from the `chats` table. */
 export interface ChatInfo {
   jid: string;
   name: string;
@@ -173,6 +193,7 @@ export interface ChatInfo {
 
 /**
  * Get all known chats, ordered by most recent activity.
+ * Used by the main group to display available groups for activation.
  */
 export function getAllChats(): ChatInfo[] {
   return db
@@ -187,29 +208,11 @@ export function getAllChats(): ChatInfo[] {
 }
 
 /**
- * Get timestamp of last group metadata sync.
- */
-export function getLastGroupSync(): string | null {
-  // Store sync time in a special chat entry
-  const row = db
-    .prepare(`SELECT last_message_time FROM chats WHERE jid = '__group_sync__'`)
-    .get() as { last_message_time: string } | undefined;
-  return row?.last_message_time || null;
-}
-
-/**
- * Record that group metadata was synced.
- */
-export function setLastGroupSync(): void {
-  const now = new Date().toISOString();
-  db.prepare(
-    `INSERT OR REPLACE INTO chats (jid, name, last_message_time) VALUES ('__group_sync__', '__group_sync__', ?)`,
-  ).run(now);
-}
-
-/**
  * Store a message with full content.
  * Only call this for registered groups where message history is needed.
+ * Uses INSERT OR REPLACE to handle duplicate message IDs idempotently.
+ *
+ * @param msg - The message to store, including sender, content, and timestamps
  */
 export function storeMessage(msg: NewMessage): void {
   db.prepare(
@@ -227,32 +230,17 @@ export function storeMessage(msg: NewMessage): void {
 }
 
 /**
- * Store a message directly (for non-WhatsApp channels that don't use Baileys proto).
+ * Fetch new non-bot messages across multiple chats since a given timestamp.
+ *
+ * Used by the message loop to detect incoming messages that need agent attention.
+ * Filters bot messages using both the `is_bot_message` flag and a content prefix
+ * pattern as a backstop for messages inserted before the migration ran.
+ *
+ * @param jids - List of chat JIDs to query (must be non-empty)
+ * @param lastTimestamp - Exclusive lower bound; only messages after this are returned
+ * @param botPrefix - The assistant name prefix used to identify outbound bot messages
+ * @returns Matching messages and the highest timestamp seen (for cursor advancement)
  */
-export function storeMessageDirect(msg: {
-  id: string;
-  chat_jid: string;
-  sender: string;
-  sender_name: string;
-  content: string;
-  timestamp: string;
-  is_from_me: boolean;
-  is_bot_message?: boolean;
-}): void {
-  db.prepare(
-    `INSERT OR REPLACE INTO messages (id, chat_jid, sender, sender_name, content, timestamp, is_from_me, is_bot_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    msg.id,
-    msg.chat_jid,
-    msg.sender,
-    msg.sender_name,
-    msg.content,
-    msg.timestamp,
-    msg.is_from_me ? 1 : 0,
-    msg.is_bot_message ? 1 : 0,
-  );
-}
-
 export function getNewMessages(
   jids: string[],
   lastTimestamp: string,
@@ -283,6 +271,17 @@ export function getNewMessages(
   return { messages: rows, newTimestamp };
 }
 
+/**
+ * Fetch all non-bot messages in a chat since a given timestamp.
+ *
+ * Used by `processGroupMessages` to build the full context window for a
+ * single group, including messages that arrived between trigger invocations.
+ *
+ * @param chatJid - The target chat to query
+ * @param sinceTimestamp - Exclusive lower bound timestamp
+ * @param botPrefix - The assistant name prefix used to filter outbound messages
+ * @returns Ordered list of user messages since the given timestamp
+ */
 export function getMessagesSince(
   chatJid: string,
   sinceTimestamp: string,
@@ -302,6 +301,11 @@ export function getMessagesSince(
     .all(chatJid, sinceTimestamp, `${botPrefix}:%`) as NewMessage[];
 }
 
+/**
+ * Create a new scheduled task record.
+ *
+ * @param task - Task definition; last_run and last_result are omitted on creation
+ */
 export function createTask(
   task: Omit<ScheduledTask, 'last_run' | 'last_result'>,
 ): void {
@@ -324,26 +328,36 @@ export function createTask(
   );
 }
 
+/**
+ * Fetch a single task by its ID.
+ *
+ * @param id - The task ID
+ * @returns The task record, or undefined if not found
+ */
 export function getTaskById(id: string): ScheduledTask | undefined {
   return db.prepare('SELECT * FROM scheduled_tasks WHERE id = ?').get(id) as
     | ScheduledTask
     | undefined;
 }
 
-export function getTasksForGroup(groupFolder: string): ScheduledTask[] {
-  return db
-    .prepare(
-      'SELECT * FROM scheduled_tasks WHERE group_folder = ? ORDER BY created_at DESC',
-    )
-    .all(groupFolder) as ScheduledTask[];
-}
-
+/**
+ * Get all scheduled tasks, ordered by creation time descending.
+ * Used to build the tasks snapshot written to each group's IPC directory.
+ */
 export function getAllTasks(): ScheduledTask[] {
   return db
     .prepare('SELECT * FROM scheduled_tasks ORDER BY created_at DESC')
     .all() as ScheduledTask[];
 }
 
+/**
+ * Update mutable fields on a scheduled task.
+ * Only fields present in `updates` are changed; omitted fields are left as-is.
+ * No-ops if `updates` is empty.
+ *
+ * @param id - The task ID to update
+ * @param updates - Partial set of fields to change
+ */
 export function updateTask(
   id: string,
   updates: Partial<
@@ -385,12 +399,22 @@ export function updateTask(
   ).run(...values);
 }
 
+/**
+ * Permanently delete a task and all its run log entries.
+ * Deletes child `task_run_logs` rows first to satisfy the foreign key constraint.
+ *
+ * @param id - The task ID to delete
+ */
 export function deleteTask(id: string): void {
   // Delete child records first (FK constraint)
   db.prepare('DELETE FROM task_run_logs WHERE task_id = ?').run(id);
   db.prepare('DELETE FROM scheduled_tasks WHERE id = ?').run(id);
 }
 
+/**
+ * Fetch all active tasks whose `next_run` is at or before the current time.
+ * Results are ordered by `next_run` so the oldest overdue tasks run first.
+ */
 export function getDueTasks(): ScheduledTask[] {
   const now = new Date().toISOString();
   return db
@@ -404,6 +428,17 @@ export function getDueTasks(): ScheduledTask[] {
     .all(now) as ScheduledTask[];
 }
 
+/**
+ * Record a task run outcome and advance the task's schedule.
+ *
+ * Sets `last_run` to now, `last_result` to the summary, and `next_run` to the
+ * computed next fire time. When `nextRun` is null (one-time tasks), the task
+ * status is flipped to 'completed' so it won't be picked up again.
+ *
+ * @param id - The task ID
+ * @param nextRun - Next ISO timestamp to run, or null for one-time tasks
+ * @param lastResult - Short summary of the run result (truncated if needed)
+ */
 export function updateTaskAfterRun(
   id: string,
   nextRun: string | null,
@@ -419,6 +454,11 @@ export function updateTaskAfterRun(
   ).run(nextRun, now, lastResult, nextRun, id);
 }
 
+/**
+ * Append a task run log entry for audit and debugging.
+ *
+ * @param log - The run log record to insert
+ */
 export function logTaskRun(log: TaskRunLog): void {
   db.prepare(
     `
@@ -437,6 +477,13 @@ export function logTaskRun(log: TaskRunLog): void {
 
 // --- Router state accessors ---
 
+/**
+ * Read a key from the persistent router_state table.
+ * Used to restore polling cursors (last_timestamp, last_agent_timestamp) on startup.
+ *
+ * @param key - The state key to read
+ * @returns The stored value string, or undefined if the key doesn't exist
+ */
 export function getRouterState(key: string): string | undefined {
   const row = db
     .prepare('SELECT value FROM router_state WHERE key = ?')
@@ -444,6 +491,12 @@ export function getRouterState(key: string): string | undefined {
   return row?.value;
 }
 
+/**
+ * Write or overwrite a key in the persistent router_state table.
+ *
+ * @param key - The state key to write
+ * @param value - The value to store
+ */
 export function setRouterState(key: string, value: string): void {
   db.prepare(
     'INSERT OR REPLACE INTO router_state (key, value) VALUES (?, ?)',
@@ -452,19 +505,25 @@ export function setRouterState(key: string, value: string): void {
 
 // --- Session accessors ---
 
-export function getSession(groupFolder: string): string | undefined {
-  const row = db
-    .prepare('SELECT session_id FROM sessions WHERE group_folder = ?')
-    .get(groupFolder) as { session_id: string } | undefined;
-  return row?.session_id;
-}
-
+/**
+ * Persist a Claude session ID for a group.
+ * Session IDs allow the agent to resume a conversation after a restart.
+ *
+ * @param groupFolder - The group's folder name (primary key)
+ * @param sessionId - The Claude session ID to persist
+ */
 export function setSession(groupFolder: string, sessionId: string): void {
   db.prepare(
     'INSERT OR REPLACE INTO sessions (group_folder, session_id) VALUES (?, ?)',
   ).run(groupFolder, sessionId);
 }
 
+/**
+ * Load all persisted session IDs keyed by group folder name.
+ * Called once on startup to restore in-memory session state.
+ *
+ * @returns Map of groupFolder -> sessionId
+ */
 export function getAllSessions(): Record<string, string> {
   const rows = db
     .prepare('SELECT group_folder, session_id FROM sessions')
@@ -478,6 +537,12 @@ export function getAllSessions(): Record<string, string> {
 
 // --- Registered group accessors ---
 
+/**
+ * Fetch a single registered group by its JID.
+ *
+ * @param jid - The chat JID to look up
+ * @returns The group with its JID included, or undefined if not found
+ */
 export function getRegisteredGroup(
   jid: string,
 ): (RegisteredGroup & { jid: string }) | undefined {
@@ -507,6 +572,13 @@ export function getRegisteredGroup(
   };
 }
 
+/**
+ * Persist a registered group to the database.
+ * Uses INSERT OR REPLACE so this also handles updates to an existing registration.
+ *
+ * @param jid - The chat JID (primary key)
+ * @param group - Group metadata to store
+ */
 export function setRegisteredGroup(jid: string, group: RegisteredGroup): void {
   db.prepare(
     `INSERT OR REPLACE INTO registered_groups (jid, name, folder, trigger_pattern, added_at, agent_config, requires_trigger)
@@ -522,6 +594,12 @@ export function setRegisteredGroup(jid: string, group: RegisteredGroup): void {
   );
 }
 
+/**
+ * Load all registered groups into a JID-keyed map.
+ * Called once on startup to restore in-memory state.
+ *
+ * @returns Map of chatJid -> RegisteredGroup
+ */
 export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
   const rows = db.prepare('SELECT * FROM registered_groups').all() as Array<{
     jid: string;
@@ -549,6 +627,14 @@ export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
 
 // --- JSON migration ---
 
+/**
+ * One-time migration from the legacy JSON file store to SQLite.
+ *
+ * Reads router_state.json, sessions.json, and registered_groups.json from the
+ * data directory, imports their contents into the appropriate DB tables, then
+ * renames each file to `*.migrated` so the migration doesn't repeat on the
+ * next startup. Files that don't exist or can't be parsed are silently skipped.
+ */
 function migrateJsonState(): void {
   const migrateFile = (filename: string) => {
     const filePath = path.join(DATA_DIR, filename);

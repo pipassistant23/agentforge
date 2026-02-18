@@ -1,3 +1,16 @@
+/**
+ * IPC watcher and task dispatcher for AgentForge.
+ *
+ * Agents communicate back to the host by writing JSON files to their
+ * group-namespaced IPC directories. This module polls those directories
+ * and executes the requested actions (send messages, manage tasks,
+ * register groups) with authorization checks enforced by directory identity.
+ *
+ * Directory layout:
+ *   /data/ipc/{groupFolder}/messages/*.json  - outbound messages to users
+ *   /data/ipc/{groupFolder}/tasks/*.json     - task management and group registration
+ *   /data/ipc/errors/                        - files that failed to process
+ */
 import fs from 'fs';
 import path from 'path';
 
@@ -16,6 +29,7 @@ import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
 import { logger } from './logger.js';
 import { RegisteredGroup } from './types.js';
 
+/** Dependencies injected into the IPC watcher to decouple it from the orchestrator. */
 export interface IpcDeps {
   sendMessage: (jid: string, text: string) => Promise<void>;
   registeredGroups: () => Record<string, RegisteredGroup>;
@@ -30,8 +44,22 @@ export interface IpcDeps {
   ) => void;
 }
 
+/** Prevents startIpcWatcher from being called more than once. */
 let ipcWatcherRunning = false;
 
+/**
+ * Start the polling loop that processes IPC files from agent processes.
+ *
+ * Scans all group subdirectories under the IPC base directory on each tick,
+ * processing message and task files in sequence. Authorization is derived
+ * from the directory the file was found in — agents cannot spoof another
+ * group's identity by putting a different groupFolder in the file payload.
+ *
+ * Files that fail to process are moved to `errors/` rather than deleted,
+ * preserving them for debugging without blocking the loop.
+ *
+ * @param deps - Host services the watcher can call (send, register, sync)
+ */
 export function startIpcWatcher(deps: IpcDeps): void {
   if (ipcWatcherRunning) {
     logger.debug('IPC watcher already running, skipping duplicate start');
@@ -74,13 +102,15 @@ export function startIpcWatcher(deps: IpcDeps): void {
             try {
               const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
               if (data.type === 'message' && data.chatJid && data.text) {
-                // Authorization: verify this group can send to this chatJid
+                // Authorization: verify this group can send to this chatJid.
+                // Main group can send to any JID; others can only send to their own.
                 const targetGroup = registeredGroups[data.chatJid];
                 if (
                   isMain ||
                   (targetGroup && targetGroup.folder === sourceGroup)
                 ) {
-                  // Route through bot pool if sender is specified and it's a Telegram chat
+                  // Route through bot pool if sender is specified and it's a Telegram chat.
+                  // This gives sub-agents their own named bot identity in the conversation.
                   if (
                     data.sender &&
                     data.chatJid.startsWith('tg:') &&
@@ -167,6 +197,25 @@ export function startIpcWatcher(deps: IpcDeps): void {
   logger.info('IPC watcher started (per-group namespaces)');
 }
 
+/**
+ * Dispatch a single task IPC payload, enforcing authorization before acting.
+ *
+ * Supported actions:
+ * - `schedule_task`  - Create a new scheduled task (non-main can only target self)
+ * - `pause_task`     - Pause an active task (non-main can only pause own tasks)
+ * - `resume_task`    - Resume a paused task (non-main can only resume own tasks)
+ * - `cancel_task`    - Delete a task permanently (non-main can only cancel own tasks)
+ * - `refresh_groups` - Force a group metadata sync (main only)
+ * - `register_group` - Activate a new group JID (main only, with input validation)
+ *
+ * Authorization is based on `sourceGroup` (the directory the file came from),
+ * NOT any group identifier inside the file payload.
+ *
+ * @param data - The parsed IPC payload
+ * @param sourceGroup - Group folder that wrote the file (the verified identity)
+ * @param isMain - Whether sourceGroup is the main orchestrator group
+ * @param deps - Host services for group registration and metadata sync
+ */
 export async function processTaskIpc(
   data: {
     type: string;
@@ -225,6 +274,7 @@ export async function processTaskIpc(
 
         const scheduleType = data.schedule_type as 'cron' | 'interval' | 'once';
 
+        // Calculate the first next_run timestamp from the schedule expression
         let nextRun: string | null = null;
         if (scheduleType === 'cron') {
           try {

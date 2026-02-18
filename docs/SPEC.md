@@ -1,5 +1,7 @@
 # AgentForge Specification
 
+> **DEPRECATED / HISTORICAL**: This document describes the original WhatsApp-based architecture and is no longer current. AgentForge now runs on Telegram with baremetal execution. This file is kept for historical reference only.
+
 A personal Claude assistant accessible via WhatsApp, with persistent memory per conversation, scheduled tasks, and email integration.
 
 ---
