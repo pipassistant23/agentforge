@@ -1,0 +1,66 @@
+version: 2
+
+updates:
+  # Main package dependencies
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'UTC'
+    open-pull-requests-limit: 10
+    reviewers:
+      - 'gavrielc'
+    labels:
+      - 'dependencies'
+      - 'automated'
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      # Group minor and patch updates together to reduce PR noise
+      minor-and-patch:
+        update-types:
+          - 'minor'
+          - 'patch'
+      # TypeScript and type definitions together
+      typescript:
+        patterns:
+          - 'typescript'
+          - '@types/*'
+      # Vitest testing framework
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+
+  # Agent runner package dependencies
+  - package-ecosystem: 'npm'
+    directory: '/agent-runner-src'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'UTC'
+    open-pull-requests-limit: 5
+    labels:
+      - 'dependencies'
+      - 'automated'
+      - 'agent-runner'
+    commit-message:
+      prefix: 'chore(deps/agent-runner)'
+
+  # GitHub Actions versions
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'UTC'
+    labels:
+      - 'dependencies'
+      - 'automated'
+      - 'github-actions'
+    commit-message:
+      prefix: 'chore(ci)'

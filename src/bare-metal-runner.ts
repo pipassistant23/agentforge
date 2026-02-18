@@ -129,7 +129,11 @@ export async function runContainerAgent(
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: path.join(GROUPS_DIR, group.folder),
       env: {
-        ...process.env,
+        // SECURITY: Only pass necessary env vars, exclude sensitive tokens
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        NODE_ENV: process.env.NODE_ENV,
+        LOG_LEVEL: process.env.LOG_LEVEL,
         AGENTFORGE_CHAT_JID: input.chatJid,
         AGENTFORGE_GROUP_FOLDER: input.groupFolder,
         AGENTFORGE_IS_MAIN: input.isMain ? '1' : '0',
@@ -147,10 +151,48 @@ export async function runContainerAgent(
     let stdoutTruncated = false;
     let stderrTruncated = false;
 
+    // SECURITY: Handle spawn errors (file not found, permissions, etc.)
+    agentProcess.on('error', (err) => {
+      logger.error(
+        { group: group.name, error: err, processName },
+        'Failed to spawn agent process',
+      );
+      resolve({
+        status: 'error',
+        result: null,
+        error: `Failed to spawn agent: ${err.message}`,
+      });
+    });
+
     // Pass secrets via stdin (never written to disk)
     input.secrets = readSecrets();
-    agentProcess.stdin!.write(JSON.stringify(input));
-    agentProcess.stdin!.end();
+
+    // SECURITY: Check if stdin is available before writing
+    if (!agentProcess.stdin) {
+      logger.error({ group: group.name, processName }, 'Agent process stdin not available');
+      agentProcess.kill();
+      resolve({
+        status: 'error',
+        result: null,
+        error: 'Agent process stdin not available',
+      });
+      return;
+    }
+
+    try {
+      agentProcess.stdin.write(JSON.stringify(input));
+      agentProcess.stdin.end();
+    } catch (err) {
+      logger.error({ group: group.name, error: err }, 'Failed to write to agent stdin');
+      agentProcess.kill();
+      resolve({
+        status: 'error',
+        result: null,
+        error: `Failed to write to agent stdin: ${err}`,
+      });
+      return;
+    }
+
     // Remove secrets from input so they don't appear in logs
     delete input.secrets;
 
@@ -200,7 +242,15 @@ export async function runContainerAgent(
             // Activity detected — reset the hard timeout
             resetTimeout();
             // Call onOutput for all markers (including null results)
-            outputChain = outputChain.then(() => onOutput(parsed));
+            // SECURITY: Add error handler to prevent unhandled rejections
+            outputChain = outputChain
+              .then(() => onOutput(parsed))
+              .catch((err) => {
+                logger.error(
+                  { group: group.name, error: err },
+                  'Error in output callback, will continue processing',
+                );
+              });
           } catch (err) {
             logger.warn(
               { group: group.name, error: err },
@@ -278,13 +328,23 @@ export async function runContainerAgent(
             { group: group.name, processName, duration, code },
             'Agent timed out after output (idle cleanup)',
           );
-          outputChain.then(() => {
-            resolve({
-              status: 'success',
-              result: null,
-              newSessionId,
+          outputChain
+            .then(() => {
+              resolve({
+                status: 'success',
+                result: null,
+                newSessionId,
+              });
+            })
+            .catch((err) => {
+              logger.error({ group: group.name, error: err }, 'Error in final output chain');
+              resolve({
+                status: 'error',
+                result: null,
+                error: `Output callback error: ${err.message}`,
+                newSessionId,
+              });
             });
-          });
           return;
         }
 
@@ -346,27 +406,47 @@ export async function runContainerAgent(
         );
 
         // Wait for output chain to finish before resolving
-        outputChain.then(() => {
-          resolve({
-            status: 'error',
-            result: null,
-            error: `Agent process exited with code ${code}`,
-            newSessionId,
+        outputChain
+          .then(() => {
+            resolve({
+              status: 'error',
+              result: null,
+              error: `Agent process exited with code ${code}`,
+              newSessionId,
+            });
+          })
+          .catch((err) => {
+            logger.error({ group: group.name, error: err }, 'Error in final output chain');
+            resolve({
+              status: 'error',
+              result: null,
+              error: `Agent exited with code ${code}, output callback error: ${err.message}`,
+              newSessionId,
+            });
           });
-        });
         return;
       }
 
       logger.info({ group: group.name, code, duration }, 'Agent process completed');
 
       // Wait for output chain to finish
-      outputChain.then(() => {
-        resolve({
-          status: 'success',
-          result: null,
-          newSessionId,
+      outputChain
+        .then(() => {
+          resolve({
+            status: 'success',
+            result: null,
+            newSessionId,
+          });
+        })
+        .catch((err) => {
+          logger.error({ group: group.name, error: err }, 'Error in final output chain');
+          resolve({
+            status: 'error',
+            result: null,
+            error: `Output callback error: ${err.message}`,
+            newSessionId,
+          });
         });
-      });
     });
   });
 }

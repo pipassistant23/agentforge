@@ -368,21 +368,51 @@ export async function processTaskIpc(
         );
         break;
       }
-      if (data.jid && data.name && data.folder && data.trigger) {
-        deps.registerGroup(data.jid, {
-          name: data.name,
-          folder: data.folder,
-          trigger: data.trigger,
-          added_at: new Date().toISOString(),
-          agentConfig: data.agentConfig,
-          requiresTrigger: data.requiresTrigger,
-        });
-      } else {
+      // Validate required fields
+      if (!data.jid || !data.name || !data.folder || !data.trigger) {
         logger.warn(
           { data },
           'Invalid register_group request - missing required fields',
         );
+        break;
       }
+
+      // SECURITY: Validate folder name to prevent path traversal
+      const folderRegex = /^[a-z0-9][a-z0-9_-]*$/;
+      if (!folderRegex.test(data.folder)) {
+        logger.error(
+          { folder: data.folder, sourceGroup },
+          'Invalid folder name - must be alphanumeric with hyphens/underscores only',
+        );
+        break;
+      }
+
+      // Validate JID format
+      if (!data.jid.match(/^(tg|wa):-?\d+$/)) {
+        logger.error(
+          { jid: data.jid, sourceGroup },
+          'Invalid JID format - must be tg:ID or wa:ID',
+        );
+        break;
+      }
+
+      // Validate name length
+      if (data.name.length > 100) {
+        logger.error(
+          { nameLength: data.name.length, sourceGroup },
+          'Invalid name - exceeds 100 characters',
+        );
+        break;
+      }
+
+      deps.registerGroup(data.jid, {
+        name: data.name,
+        folder: data.folder,
+        trigger: data.trigger,
+        added_at: new Date().toISOString(),
+        agentConfig: data.agentConfig,
+        requiresTrigger: data.requiresTrigger,
+      });
       break;
 
     default:

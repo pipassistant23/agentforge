@@ -1,0 +1,121 @@
+name: Lint & Format
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prettier:
+    name: Prettier
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        id: prettier
+        run: npm run format:check
+        continue-on-error: true
+
+      - name: Show formatting diff
+        if: steps.prettier.outcome == 'failure'
+        run: |
+          echo "The following files have formatting issues:"
+          npx prettier --list-different "src/**/*.ts" || true
+
+      - name: Comment on PR with formatting issues
+        if: steps.prettier.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            let unformatted = '';
+            try {
+              unformatted = execSync('npx prettier --list-different "src/**/*.ts"', { encoding: 'utf8' });
+            } catch (e) {
+              unformatted = e.stdout || 'Unable to determine files';
+            }
+
+            const body = [
+              '## Formatting Issues',
+              '',
+              'This PR has files that do not match Prettier formatting. Run the following command to fix:',
+              '',
+              '```bash',
+              'npm run format',
+              '```',
+              '',
+              '**Affected files:**',
+              '```',
+              unformatted.trim(),
+              '```',
+            ].join('\n');
+
+            // Find existing comment to update rather than posting duplicates
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existingComment = comments.find(c =>
+              c.user.login === 'github-actions[bot]' && c.body.includes('## Formatting Issues')
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if formatting issues found
+        if: steps.prettier.outcome == 'failure'
+        run: exit 1
+
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
