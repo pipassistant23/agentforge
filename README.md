@@ -9,7 +9,6 @@
 
 [![CI](https://github.com/pipassistant23/agentforge/actions/workflows/ci.yml/badge.svg)](https://github.com/pipassistant23/agentforge/actions/workflows/ci.yml)
 [![Security Scan](https://github.com/pipassistant23/agentforge/actions/workflows/security-scan.yml/badge.svg)](https://github.com/pipassistant23/agentforge/actions/workflows/security-scan.yml)
-![Version](https://img.shields.io/github/v/release/pipassistant23/agentforge)
 ![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-linux-lightgrey)
