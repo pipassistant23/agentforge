@@ -17,7 +17,7 @@
     "version": "node -e \"const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));console.log(p.version);\""
   },
   "dependencies": {
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^12.6.2",
     "cron-parser": "^5.5.0",
     "grammy": "^1.40.0",
     "pino": "^10.3.1",
