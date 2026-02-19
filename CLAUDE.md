@@ -48,6 +48,57 @@ Single Node.js process that connects to Telegram, routes messages to Claude Agen
 - ✅ File-based IPC for bidirectional communication
 - ✅ Per-group isolation with dedicated workspaces
 
+## Git Practices
+
+This is a public repository. `main` is always stable and reflects what the running service is on.
+
+### Branching
+
+- `main` is protected — never commit directly, no force pushes
+- All work happens on a short-lived branch, merged via PR
+- Branch naming mirrors the commit type:
+  - `feat/short-description`
+  - `fix/short-description`
+  - `chore/short-description`
+  - `refactor/short-description`
+  - `docs/short-description`
+
+### Commit Messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+| Type | When to use |
+|------|-------------|
+| `feat:` | New functionality |
+| `fix:` | Bug fixes |
+| `refactor:` | Code changes with no behavior change |
+| `chore:` | Tooling, deps, config, CI |
+| `docs:` | Documentation only |
+| `test:` | Tests only |
+| `style:` | Formatting only |
+
+Keep the subject line under 72 characters. Use the body for the "why" when it isn't obvious.
+
+### Pull Requests
+
+- Open a PR to merge any branch into `main`, even when working solo
+- PR title follows the same Conventional Commits format
+- Squash trivial fixup commits before merging; preserve meaningful history
+
+### Versioning
+
+No formal release process. Tag meaningful milestones manually:
+
+- Format: `vMAJOR.MINOR.PATCH`
+- Increment **minor** for significant new features
+- Increment **patch** for fixes and small improvements
+- Tag from `main` after merging, with a short annotation describing the milestone
+
+```bash
+git tag -a v0.2.0 -m "Add IPC task snapshot refresh"
+git push origin v0.2.0
+```
+
 ## Development
 
 Run commands directly—don't tell the user to run them.
