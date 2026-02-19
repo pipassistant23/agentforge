@@ -581,6 +581,41 @@ async function runQuery(
     .filter(Boolean)
     .join('\n\n---\n\n');
 
+  // Load long-term memory for this group. Injected unconditionally regardless
+  // of trigger source (Telegram, scheduled task, future channels) — every
+  // invocation is the same agent instance and shares the same persistent memory.
+  const memoryParts: string[] = [];
+
+  const memoryMdPath = path.join(WORKSPACE_GROUP, 'memory.md');
+  if (fs.existsSync(memoryMdPath)) {
+    const memoryContent = fs.readFileSync(memoryMdPath, 'utf-8').trim();
+    if (memoryContent) {
+      memoryParts.push(`## Long-term memory\n\n${memoryContent}`);
+    }
+  }
+
+  // Include today's and yesterday's daily logs for recent context
+  const toDateStr = (d: Date): string => d.toISOString().slice(0, 10);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  for (const date of [toDateStr(yesterday), toDateStr(today)]) {
+    const dailyLogPath = path.join(WORKSPACE_GROUP, 'memory', `${date}.md`);
+    if (fs.existsSync(dailyLogPath)) {
+      const logContent = fs.readFileSync(dailyLogPath, 'utf-8').trim();
+      if (logContent) {
+        memoryParts.push(`## Memory log: ${date}\n\n${logContent}`);
+      }
+    }
+  }
+
+  const memoryContext = memoryParts.join('\n\n---\n\n');
+
+  // Final system prompt: instructions first, then memory context
+  const fullSystemPrompt = [combinedAgentsMd, memoryContext]
+    .filter(Boolean)
+    .join('\n\n---\n\n');
+
   // Discover additional directories mounted at extra workspace.
   // These are passed to the SDK for additional context (e.g., shared resources).
   const extraDirs: string[] = [];
@@ -603,11 +638,11 @@ async function runQuery(
       additionalDirectories: extraDirs.length > 0 ? extraDirs : undefined,
       resume: sessionId,
       resumeSessionAt: resumeAt,
-      systemPrompt: combinedAgentsMd
+      systemPrompt: fullSystemPrompt
         ? {
             type: 'preset' as const,
             preset: 'claude_code' as const,
-            append: combinedAgentsMd,
+            append: fullSystemPrompt,
           }
         : undefined,
       allowedTools: [
