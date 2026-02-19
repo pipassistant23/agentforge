@@ -10,7 +10,8 @@ import path from 'path';
 const DB_PATH = path.join(process.cwd(), 'store', 'messages.db');
 const MAIN_GROUP_FOLDER = 'main';
 // TODO: Get this from Telegram bot info or user DM
-const MAIN_DM_CHAT_ID = process.env.MAIN_DM_CHAT_ID || 'YOUR_TELEGRAM_DM_CHAT_ID';
+const MAIN_DM_CHAT_ID =
+  process.env.MAIN_DM_CHAT_ID || 'YOUR_TELEGRAM_DM_CHAT_ID';
 
 const TIMEZONE = process.env.DREAM_CYCLE_TIMEZONE || 'America/New_York';
 
@@ -78,11 +79,15 @@ function initTasks() {
   // Calculate next run times
   const dreamCycleNextRun = CronExpressionParser.parse(DREAM_CYCLE_CRON, {
     tz: TIMEZONE,
-  }).next().toISOString();
+  })
+    .next()
+    .toISOString();
 
   const morningBriefNextRun = CronExpressionParser.parse(MORNING_BRIEF_CRON, {
     tz: TIMEZONE,
-  }).next().toISOString();
+  })
+    .next()
+    .toISOString();
 
   console.log(`Next dream cycle: ${dreamCycleNextRun}`);
   console.log(`Next morning brief: ${morningBriefNextRun}`);
@@ -101,20 +106,20 @@ function initTasks() {
     db.prepare(
       `UPDATE scheduled_tasks
        SET prompt = ?, schedule_value = ?, next_run = ?, context_mode = ?
-       WHERE id = ?`
+       WHERE id = ?`,
     ).run(
       DREAM_CYCLE_PROMPT,
       DREAM_CYCLE_CRON,
       dreamCycleNextRun,
       'isolated',
-      'dream-cycle'
+      'dream-cycle',
     );
   } else {
     console.log('Creating dream cycle task...');
     db.prepare(
       `INSERT INTO scheduled_tasks
        (id, group_folder, chat_jid, prompt, schedule_type, schedule_value, context_mode, next_run, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       'dream-cycle',
       MAIN_GROUP_FOLDER,
@@ -125,7 +130,7 @@ function initTasks() {
       'isolated',
       dreamCycleNextRun,
       'active',
-      new Date().toISOString()
+      new Date().toISOString(),
     );
   }
 
@@ -135,20 +140,20 @@ function initTasks() {
     db.prepare(
       `UPDATE scheduled_tasks
        SET prompt = ?, schedule_value = ?, next_run = ?, context_mode = ?
-       WHERE id = ?`
+       WHERE id = ?`,
     ).run(
       MORNING_BRIEF_PROMPT,
       MORNING_BRIEF_CRON,
       morningBriefNextRun,
       'isolated',
-      'morning-brief'
+      'morning-brief',
     );
   } else {
     console.log('Creating morning brief task...');
     db.prepare(
       `INSERT INTO scheduled_tasks
        (id, group_folder, chat_jid, prompt, schedule_type, schedule_value, context_mode, next_run, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       'morning-brief',
       MAIN_GROUP_FOLDER,
@@ -159,7 +164,7 @@ function initTasks() {
       'isolated',
       morningBriefNextRun,
       'active',
-      new Date().toISOString()
+      new Date().toISOString(),
     );
   }
 
@@ -168,8 +173,12 @@ function initTasks() {
   console.log('');
   console.log('Next steps:');
   console.log('1. Set MAIN_DM_CHAT_ID in .env with your Telegram DM chat ID');
-  console.log('2. Set DREAM_CYCLE_TIMEZONE in .env (default: America/New_York)');
-  console.log('3. Restart the service: sudo systemctl restart agentforge.service');
+  console.log(
+    '2. Set DREAM_CYCLE_TIMEZONE in .env (default: America/New_York)',
+  );
+  console.log(
+    '3. Restart the service: sudo systemctl restart agentforge.service',
+  );
 }
 
 initTasks();

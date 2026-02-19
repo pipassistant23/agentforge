@@ -26,6 +26,7 @@ Once we've talked, I'll document what I learned:
 ## Connectivity
 
 AgentForge connects via:
+
 - **Telegram** — Primary channel for messages and commands
 - **Scheduled tasks** — Background work and reminders
 - **File workspace** — Persistent storage and memory

@@ -165,15 +165,15 @@ Runs as a child process, isolated from the orchestrator:
 
 An MCP server process that the agent runner starts as a sidecar. Exposes tools the agent can call:
 
-| Tool | Description |
-|------|-------------|
-| `send_message` | Send a message to the user immediately |
-| `schedule_task` | Create a recurring or one-time scheduled task |
-| `list_tasks` | View scheduled tasks |
-| `pause_task` | Pause a task |
-| `resume_task` | Resume a task |
-| `cancel_task` | Delete a task |
-| `register_group` | Register a new Telegram group (main only) |
+| Tool             | Description                                   |
+| ---------------- | --------------------------------------------- |
+| `send_message`   | Send a message to the user immediately        |
+| `schedule_task`  | Create a recurring or one-time scheduled task |
+| `list_tasks`     | View scheduled tasks                          |
+| `pause_task`     | Pause a task                                  |
+| `resume_task`    | Resume a task                                 |
+| `cancel_task`    | Delete a task                                 |
+| `register_group` | Register a new Telegram group (main only)     |
 
 Each tool writes a JSON file to the appropriate IPC directory, which the orchestrator's IPC watcher picks up and processes.
 
@@ -291,21 +291,21 @@ GroupQueue decides it's this group's turn
 
 Each group gets its own working directory:
 
-| Path | Purpose |
-|------|---------|
-| `groups/{folder}/` | Agent's working directory (cwd) |
-| `groups/{folder}/AGENTS.md` | Group-specific operational guidelines (primary instruction file) |
-| `groups/{folder}/SOUL.md` | Identity and behavioral boundaries (synced from global) |
-| `groups/{folder}/TOOLS.md` | Environment and tool reference (synced from global) |
-| `groups/{folder}/USER.md` | User preferences for this group |
-| `groups/{folder}/memory.md` | Long-term facts and patterns |
-| `groups/{folder}/memory/` | Daily conversation logs (`YYYY-MM-DD.md`) |
-| `groups/{folder}/logs/` | Per-run agent execution logs |
-| `groups/global/AGENTS.md` | Shared operational guidelines (non-main groups) |
-| `groups/global/SOUL.md` | Shared identity template |
-| `groups/global/TOOLS.md` | Shared tool reference template |
-| `data/ipc/{folder}/` | IPC directories |
-| `data/sessions/{folder}/.claude/` | SDK session files and settings |
+| Path                              | Purpose                                                          |
+| --------------------------------- | ---------------------------------------------------------------- |
+| `groups/{folder}/`                | Agent's working directory (cwd)                                  |
+| `groups/{folder}/AGENTS.md`       | Group-specific operational guidelines (primary instruction file) |
+| `groups/{folder}/SOUL.md`         | Identity and behavioral boundaries (synced from global)          |
+| `groups/{folder}/TOOLS.md`        | Environment and tool reference (synced from global)              |
+| `groups/{folder}/USER.md`         | User preferences for this group                                  |
+| `groups/{folder}/memory.md`       | Long-term facts and patterns                                     |
+| `groups/{folder}/memory/`         | Daily conversation logs (`YYYY-MM-DD.md`)                        |
+| `groups/{folder}/logs/`           | Per-run agent execution logs                                     |
+| `groups/global/AGENTS.md`         | Shared operational guidelines (non-main groups)                  |
+| `groups/global/SOUL.md`           | Shared identity template                                         |
+| `groups/global/TOOLS.md`          | Shared tool reference template                                   |
+| `data/ipc/{folder}/`              | IPC directories                                                  |
+| `data/sessions/{folder}/.claude/` | SDK session files and settings                                   |
 
 ---
 

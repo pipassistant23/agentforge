@@ -7,29 +7,29 @@
 
   <br/>
 
-  [![CI](https://github.com/pipassistant23/agentforge/actions/workflows/ci.yml/badge.svg)](https://github.com/pipassistant23/agentforge/actions/workflows/ci.yml)
-  [![Security Scan](https://github.com/pipassistant23/agentforge/actions/workflows/security-scan.yml/badge.svg)](https://github.com/pipassistant23/agentforge/actions/workflows/security-scan.yml)
-  ![Version](https://img.shields.io/github/v/release/pipassistant23/agentforge)
-  ![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
-  ![License](https://img.shields.io/badge/license-MIT-blue)
-  ![Platform](https://img.shields.io/badge/platform-linux-lightgrey)
-  ![Telegram](https://img.shields.io/badge/telegram-bot-blue?logo=telegram)
-  ![Claude](https://img.shields.io/badge/Claude-AI-orange)
-  ![Tokens](repo-tokens/badge.svg)
+[![CI](https://github.com/pipassistant23/agentforge/actions/workflows/ci.yml/badge.svg)](https://github.com/pipassistant23/agentforge/actions/workflows/ci.yml)
+[![Security Scan](https://github.com/pipassistant23/agentforge/actions/workflows/security-scan.yml/badge.svg)](https://github.com/pipassistant23/agentforge/actions/workflows/security-scan.yml)
+![Version](https://img.shields.io/github/v/release/pipassistant23/agentforge)
+![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Platform](https://img.shields.io/badge/platform-linux-lightgrey)
+![Telegram](https://img.shields.io/badge/telegram-bot-blue?logo=telegram)
+![Claude](https://img.shields.io/badge/Claude-AI-orange)
+![Tokens](repo-tokens/badge.svg)
 
   <!-- token-count --><a href="https://github.com/pipassistant23/agentforge/tree/main/repo-tokens">39.0k tokens · 20% of context window</a><!-- /token-count -->
 
-  # AgentForge
+# AgentForge
 
-  **Self-hosted Claude agents on Linux — persistent, multi-group, and extensible via Telegram.**
+**Self-hosted Claude agents on Linux — persistent, multi-group, and extensible via Telegram.**
 
-  A personal AI assistant platform that runs the Anthropic Claude Agent SDK as baremetal Node.js processes, managed by systemd, with per-group memory isolation and Agent Swarm support.
+A personal AI assistant platform that runs the Anthropic Claude Agent SDK as baremetal Node.js processes, managed by systemd, with per-group memory isolation and Agent Swarm support.
 
-  **Forked from [NanoClaw](https://github.com/gavrielc/nanoclaw).** AgentForge replaces container isolation with baremetal execution, targeting dedicated servers where full system access is the goal.
+**Forked from [NanoClaw](https://github.com/gavrielc/nanoclaw).** AgentForge replaces container isolation with baremetal execution, targeting dedicated servers where full system access is the goal.
 
   <br/>
 
-  [Quick Start](#quick-start) · [Documentation](#documentation) · [Architecture](#architecture) · [Contributing](#contributing)
+[Quick Start](#quick-start) · [Documentation](#documentation) · [Architecture](#architecture) · [Contributing](#contributing)
 
 </div>
 
@@ -50,6 +50,7 @@ User → Telegram → AgentForge (SQLite + message loop) → Claude Agent SDK �
 ## ✨ Key Features
 
 ### Core Capabilities
+
 - **⚡ Baremetal execution** — Agents start in ~100-200ms as native Node.js processes (no container overhead)
 - **🔒 Per-group isolation** — Dedicated filesystem workspace and memory file per chat; context never bleeds between groups
 - **💾 Persistent sessions** — Conversations resume across restarts; full Claude Agent SDK session system
@@ -58,6 +59,7 @@ User → Telegram → AgentForge (SQLite + message loop) → Claude Agent SDK �
 - **📁 File operations** — Read/write files in group workspaces, persist data across conversations
 
 ### Infrastructure
+
 - **🔄 Systemd service** — Runs persistently as managed system service; auto-restarts on failure
 - **🔐 Secure secrets** — Delivered via stdin, never in environment variables or disk
 - **📡 File-based IPC** — Crash-safe bidirectional communication using atomic file writes
@@ -71,14 +73,15 @@ User → Telegram → AgentForge (SQLite + message loop) → Claude Agent SDK �
 
 AgentForge is designed for **dedicated servers** where the operator trusts themselves. It does not sandbox agents.
 
-| Feature | AgentForge | [NanoClaw](https://github.com/gavrielc/nanoclaw) |
-|---|---|---|
-| Container isolation | ❌ Removed by design | ✅ Yes |
-| Intended environment | Dedicated / single-operator | General / multi-tenant |
-| Agent filesystem access | Full (baremetal) | Sandboxed |
-| Secrets delivery | Via stdin (never env vars) | Container environment |
+| Feature                 | AgentForge                  | [NanoClaw](https://github.com/gavrielc/nanoclaw) |
+| ----------------------- | --------------------------- | ------------------------------------------------ |
+| Container isolation     | ❌ Removed by design        | ✅ Yes                                           |
+| Intended environment    | Dedicated / single-operator | General / multi-tenant                           |
+| Agent filesystem access | Full (baremetal)            | Sandboxed                                        |
+| Secrets delivery        | Via stdin (never env vars)  | Container environment                            |
 
 **Security guarantees:**
+
 - Secrets never written to disk or inherited by child processes
 - Agent processes receive sanitized environment (explicit allowlist)
 - Bash commands auto-unset API keys before execution
@@ -94,13 +97,13 @@ Get AgentForge running in about five minutes.
 
 ### Prerequisites
 
-| Requirement | Notes |
-|---|---|
-| 🐧 Linux (Ubuntu 22.04+) | Any modern distribution |
-| 📦 Node.js 20+ | Check with `node --version` |
-| 🤖 [Claude Code CLI](https://claude.ai/download) | Installed and authenticated on the host |
-| 💬 Telegram bot token | From [@BotFather](https://t.me/BotFather) — free |
-| 🔑 AI Provider API access | Anthropic API key, Claude Code OAuth token, or OpenAI-compatible provider |
+| Requirement                                      | Notes                                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------- |
+| 🐧 Linux (Ubuntu 22.04+)                         | Any modern distribution                                                   |
+| 📦 Node.js 20+                                   | Check with `node --version`                                               |
+| 🤖 [Claude Code CLI](https://claude.ai/download) | Installed and authenticated on the host                                   |
+| 💬 Telegram bot token                            | From [@BotFather](https://t.me/BotFather) — free                          |
+| 🔑 AI Provider API access                        | Anthropic API key, Claude Code OAuth token, or OpenAI-compatible provider |
 
 ### 1. Clone and run setup
 
@@ -245,30 +248,30 @@ All configuration uses environment variables loaded from `.env`. Full reference 
 
 ### Core Settings
 
-| Variable | Default | Description |
-|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | — | **Required.** Primary Telegram bot token from [@BotFather](https://t.me/BotFather) |
-| `ASSISTANT_NAME` | `Andy` | Trigger word — messages start with `@Name` (case-insensitive) |
-| `TELEGRAM_BOT_POOL` | — | Comma-separated bot tokens for Agent Swarm sub-agent personas |
+| Variable             | Default | Description                                                                        |
+| -------------------- | ------- | ---------------------------------------------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN` | —       | **Required.** Primary Telegram bot token from [@BotFather](https://t.me/BotFather) |
+| `ASSISTANT_NAME`     | `Andy`  | Trigger word — messages start with `@Name` (case-insensitive)                      |
+| `TELEGRAM_BOT_POOL`  | —       | Comma-separated bot tokens for Agent Swarm sub-agent personas                      |
 
 ### Authentication (Choose One)
 
-| Variable | Type | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | Pay-per-use | Anthropic API key (`sk-ant-api03-...`) |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Subscription | Claude Code OAuth token (`sk-ant-oat01-...`) |
-| `OPENAI_API_KEY` + `OPENAI_BASE_URL` | Custom provider | OpenAI-compatible API endpoint |
+| Variable                             | Type            | Description                                  |
+| ------------------------------------ | --------------- | -------------------------------------------- |
+| `ANTHROPIC_API_KEY`                  | Pay-per-use     | Anthropic API key (`sk-ant-api03-...`)       |
+| `CLAUDE_CODE_OAUTH_TOKEN`            | Subscription    | Claude Code OAuth token (`sk-ant-oat01-...`) |
+| `OPENAI_API_KEY` + `OPENAI_BASE_URL` | Custom provider | OpenAI-compatible API endpoint               |
 
 ### Advanced Settings
 
-| Variable | Default | Description |
-|---|---|---|
-| `POLL_INTERVAL` | `2000` | Message poll interval (milliseconds) |
-| `SCHEDULER_POLL_INTERVAL` | `60000` | Task scheduler check interval (milliseconds) |
-| `AGENT_TIMEOUT` | `1800000` | Max agent runtime per invocation (30 min) |
-| `IDLE_TIMEOUT` | `1800000` | How long to keep idle agent processes alive (30 min) |
-| `MAX_CONCURRENT_PROCESSES` | `5` | Maximum simultaneous agent processes across all groups |
-| `TZ` | System | Timezone for cron expressions |
+| Variable                   | Default   | Description                                            |
+| -------------------------- | --------- | ------------------------------------------------------ |
+| `POLL_INTERVAL`            | `2000`    | Message poll interval (milliseconds)                   |
+| `SCHEDULER_POLL_INTERVAL`  | `60000`   | Task scheduler check interval (milliseconds)           |
+| `AGENT_TIMEOUT`            | `1800000` | Max agent runtime per invocation (30 min)              |
+| `IDLE_TIMEOUT`             | `1800000` | How long to keep idle agent processes alive (30 min)   |
+| `MAX_CONCURRENT_PROCESSES` | `5`       | Maximum simultaneous agent processes across all groups |
+| `TZ`                       | System    | Timezone for cron expressions                          |
 
 ### Changing the assistant name
 
@@ -294,6 +297,7 @@ OPENAI_MODEL=gpt-4
 ```
 
 **Note:** When using a custom provider:
+
 - Remove or comment out `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN`
 - The provider must support the OpenAI Messages API format
 - Model availability and capabilities depend on your provider
@@ -415,21 +419,21 @@ Telegram ───────────►│  TelegramChannel (grammy pollin
 
 ### Concurrent loops
 
-| Loop | File | Interval | Purpose |
-|---|---|---|---|
-| Message loop | `src/index.ts` | 2s | Poll SQLite for new messages, route to agents |
-| Scheduler loop | `src/task-scheduler.ts` | 60s | Fire scheduled tasks when due |
-| IPC watcher | `src/ipc.ts` | 1s | Read agent output files, forward to Telegram |
+| Loop           | File                    | Interval | Purpose                                       |
+| -------------- | ----------------------- | -------- | --------------------------------------------- |
+| Message loop   | `src/index.ts`          | 2s       | Poll SQLite for new messages, route to agents |
+| Scheduler loop | `src/task-scheduler.ts` | 60s      | Fire scheduled tasks when due                 |
+| IPC watcher    | `src/ipc.ts`            | 1s       | Read agent output files, forward to Telegram  |
 
 ### Per-group isolation
 
-| Resource | Location |
-|---|---|
-| Working directory | `groups/{name}/` |
-| Group memory | `groups/{name}/CLAUDE.md` |
-| Global memory | `groups/global/CLAUDE.md` |
-| IPC directories | `data/ipc/{name}/` |
-| Session files | `data/sessions/{name}/` |
+| Resource          | Location                  |
+| ----------------- | ------------------------- |
+| Working directory | `groups/{name}/`          |
+| Group memory      | `groups/{name}/CLAUDE.md` |
+| Global memory     | `groups/global/CLAUDE.md` |
+| IPC directories   | `data/ipc/{name}/`        |
+| Session files     | `data/sessions/{name}/`   |
 
 ### File-based IPC
 
@@ -505,6 +509,7 @@ npm run format:check # Check formatting (CI)
 ### Development Workflow
 
 **After source changes:**
+
 ```bash
 npm run build
 cd agent-runner-src && npm run build && cd ..
@@ -512,17 +517,20 @@ sudo systemctl restart agentforge.service
 ```
 
 **Verify fresh code:**
+
 ```bash
 ls -lh dist/index.js                       # Build timestamp
 sudo systemctl status agentforge.service   # Process start time
 ```
 
 **Live logs:**
+
 ```bash
 sudo journalctl -u agentforge.service -f
 ```
 
 **Local debugging:**
+
 ```bash
 npm run dev  # Runs with tsx, no build step, full terminal output
 ```
@@ -534,11 +542,13 @@ npm run dev  # Runs with tsx, no build step, full terminal output
 ### Service Won't Start
 
 Check recent logs:
+
 ```bash
 sudo journalctl -u agentforge.service -n 50 --no-pager
 ```
 
 **Common issues:**
+
 - `TELEGRAM_BOT_TOKEN` and one auth method must be set in `.env`
 - Verify node path in service file matches `which node`
 - Check `.env` file permissions and syntax
@@ -546,6 +556,7 @@ sudo journalctl -u agentforge.service -n 50 --no-pager
 ### Agent Doesn't Respond
 
 **Checklist:**
+
 1. Confirm group is registered: `sqlite3 store/messages.db "SELECT jid, name FROM registered_groups;"`
 2. Verify message starts with trigger: `@YourAgent ...`
 3. Check live logs: `sudo journalctl -u agentforge.service -f`
@@ -554,6 +565,7 @@ sudo journalctl -u agentforge.service -n 50 --no-pager
 ### Running Old Code After Changes
 
 The service doesn't auto-reload. Always restart after building:
+
 ```bash
 npm run build
 cd agent-runner-src && npm run build && cd ..
@@ -563,6 +575,7 @@ sudo systemctl restart agentforge.service
 ### Local Debugging
 
 Run without systemd for full output:
+
 ```bash
 npm run dev
 ```
@@ -575,17 +588,18 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for comprehensive debuggi
 
 ### Automated Workflows
 
-| Workflow | Trigger | Purpose |
-|---|---|---|
-| `ci.yml` | PRs, `main` pushes | Type check, format, tests, build verification |
-| `security-scan.yml` | PRs, `main`, weekly | `npm audit` (high/critical CVEs), CodeQL analysis |
-| `test.yml` | PRs to `main` | Pre-merge gate: type check + Vitest |
-| `release.yml` | `v*.*.*` tags | Build, test, publish GitHub Release with changelog |
-| `skills-only.yml` | PRs to `main` | Prevents skill PRs from touching source code |
+| Workflow            | Trigger             | Purpose                                            |
+| ------------------- | ------------------- | -------------------------------------------------- |
+| `ci.yml`            | PRs, `main` pushes  | Type check, format, tests, build verification      |
+| `security-scan.yml` | PRs, `main`, weekly | `npm audit` (high/critical CVEs), CodeQL analysis  |
+| `test.yml`          | PRs to `main`       | Pre-merge gate: type check + Vitest                |
+| `release.yml`       | `v*.*.*` tags       | Build, test, publish GitHub Release with changelog |
+| `skills-only.yml`   | PRs to `main`       | Prevents skill PRs from touching source code       |
 
 ### Creating a Release
 
 Tag a commit to trigger automated release:
+
 ```bash
 git tag -a v1.2.3 -m "Release v1.2.3: description"
 git push origin v1.2.3
@@ -598,6 +612,7 @@ The workflow builds, tests, and publishes with auto-generated changelog. Pre-rel
 ### Dependency Updates
 
 Dependabot opens weekly PRs (Mondays) for:
+
 - Root npm packages
 - `agent-runner-src/` packages
 - GitHub Actions versions
@@ -610,28 +625,28 @@ Minor/patch updates are grouped; major updates are individual PRs.
 
 ### Core Documentation
 
-| Document | Description |
-|---|---|
-| [**ARCHITECTURE.md**](docs/ARCHITECTURE.md) | Complete system architecture, component reference, data flow, IPC mechanism |
-| [**INSTALLATION.md**](docs/INSTALLATION.md) | Step-by-step installation, systemd setup, first-run configuration |
-| [**TROUBLESHOOTING.md**](docs/TROUBLESHOOTING.md) | Common issues, debugging techniques, log analysis |
-| [**TEMPLATE_SYSTEM.md**](docs/TEMPLATE_SYSTEM.md) | AGENTS.md template system, variable substitution, per-group configuration |
+| Document                                          | Description                                                                 |
+| ------------------------------------------------- | --------------------------------------------------------------------------- |
+| [**ARCHITECTURE.md**](docs/ARCHITECTURE.md)       | Complete system architecture, component reference, data flow, IPC mechanism |
+| [**INSTALLATION.md**](docs/INSTALLATION.md)       | Step-by-step installation, systemd setup, first-run configuration           |
+| [**TROUBLESHOOTING.md**](docs/TROUBLESHOOTING.md) | Common issues, debugging techniques, log analysis                           |
+| [**TEMPLATE_SYSTEM.md**](docs/TEMPLATE_SYSTEM.md) | AGENTS.md template system, variable substitution, per-group configuration   |
 
 ### Development & Release
 
-| Document | Description |
-|---|---|
-| [**DEVELOPMENT.md**](docs/DEVELOPMENT.md) | Development workflow, testing, debugging |
-| [**VERSIONING.md**](docs/VERSIONING.md) | Semantic versioning policy, backward compatibility |
-| [**RELEASE_PROCESS.md**](docs/RELEASE_PROCESS.md) | Release checklist, tagging, rollback procedure |
-| [**CONTRIBUTING.md**](CONTRIBUTING.md) | Contribution guidelines, skills vs source changes, changelog requirements |
-| [**CHANGELOG.md**](CHANGELOG.md) | Version history and migration notes |
+| Document                                          | Description                                                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------- |
+| [**DEVELOPMENT.md**](docs/DEVELOPMENT.md)         | Development workflow, testing, debugging                                  |
+| [**VERSIONING.md**](docs/VERSIONING.md)           | Semantic versioning policy, backward compatibility                        |
+| [**RELEASE_PROCESS.md**](docs/RELEASE_PROCESS.md) | Release checklist, tagging, rollback procedure                            |
+| [**CONTRIBUTING.md**](CONTRIBUTING.md)            | Contribution guidelines, skills vs source changes, changelog requirements |
+| [**CHANGELOG.md**](CHANGELOG.md)                  | Version history and migration notes                                       |
 
 ### Reference
 
-| Document | Description |
-|---|---|
-| [**API.md**](docs/API.md) | MCP server tools, IPC protocol, data structures |
+| Document                                                | Description                                      |
+| ------------------------------------------------------- | ------------------------------------------------ |
+| [**API.md**](docs/API.md)                               | MCP server tools, IPC protocol, data structures  |
 | [**TEMPLATE_VARIABLES.md**](docs/TEMPLATE_VARIABLES.md) | Available template variables for AGENTS.md files |
 
 ---
@@ -643,11 +658,13 @@ AgentForge welcomes contributions. The project has a deliberate philosophy: **ca
 ### Source Code Changes
 
 ✅ **Accepted:**
+
 - Bug fixes
 - Security fixes
 - Simplifications that reduce code
 
 ❌ **Not accepted:**
+
 - New features or capabilities
 - Compatibility shims
 - Enhancements
@@ -674,13 +691,16 @@ New capabilities belong in **skills** — markdown files in `.claude/skills/` th
 ## 🙏 Credits & License
 
 ### Based On
+
 - [**NanoClaw**](https://github.com/gavrielc/nanoclaw) by [@gavrielc](https://github.com/gavrielc) — Core architecture, Claude Agent SDK integration, file-based IPC design
 
 ### Inspired By
+
 - [**OpenClaw**](https://github.com/openclaw/openclaw) — Memory structure and workspace organization patterns
 - [**Ray Fernando**](https://github.com/RayFernando1337) — Dream cycle and memory consolidation system ([video](https://youtu.be/AuofNgImNhk))
 
 ### License
+
 MIT — see [LICENSE](LICENSE) for details.
 
 ---

@@ -7,11 +7,17 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
-const QMD_BIN = path.join(process.cwd(), 'node_modules', '@tobilu', 'qmd', 'qmd');
+const QMD_BIN = path.join(
+  process.cwd(),
+  'node_modules',
+  '@tobilu',
+  'qmd',
+  'qmd',
+);
 
 interface QMDConfig {
-  workspaceDir: string;      // /workspace/group
-  qmdDataDir: string;        // /data/qmd/{groupFolder}
+  workspaceDir: string; // /workspace/group
+  qmdDataDir: string; // /data/qmd/{groupFolder}
   groupFolder: string;
 }
 
@@ -46,14 +52,26 @@ export async function initializeQMD(config: QMDConfig): Promise<void> {
   // Add collections
   console.error(`[QMD] Initializing collections for ${groupFolder}`);
 
-  await addCollection('memory', path.join(workspaceDir, 'memory'), '**/*.md',
-    'Daily logs, topic files, dream cycle briefs - user memory system');
+  await addCollection(
+    'memory',
+    path.join(workspaceDir, 'memory'),
+    '**/*.md',
+    'Daily logs, topic files, dream cycle briefs - user memory system',
+  );
 
-  await addCollection('conversations', path.join(workspaceDir, 'conversations'), '**/*.md',
-    'Archived session transcripts from past conversations');
+  await addCollection(
+    'conversations',
+    path.join(workspaceDir, 'conversations'),
+    '**/*.md',
+    'Archived session transcripts from past conversations',
+  );
 
-  await addCollection('workspace', workspaceDir, '*.md',
-    'Workspace files including AGENTS.md and other docs');
+  await addCollection(
+    'workspace',
+    workspaceDir,
+    '*.md',
+    'Workspace files including AGENTS.md and other docs',
+  );
 
   console.error(`[QMD] Collections initialized for ${groupFolder}`);
 }
@@ -75,7 +93,12 @@ async function checkCollectionsExist(): Promise<boolean> {
 /**
  * Add a collection to QMD
  */
-async function addCollection(name: string, dirPath: string, mask: string, context: string): Promise<void> {
+async function addCollection(
+  name: string,
+  dirPath: string,
+  mask: string,
+  context: string,
+): Promise<void> {
   try {
     await runQMD([
       'collection',
@@ -84,20 +107,17 @@ async function addCollection(name: string, dirPath: string, mask: string, contex
       '--name',
       name,
       '--mask',
-      mask
+      mask,
     ]);
 
     // Add context description
-    await runQMD([
-      'context',
-      'add',
-      `qmd://${name}`,
-      context
-    ]);
+    await runQMD(['context', 'add', `qmd://${name}`, context]);
 
     console.error(`[QMD]   ✓ Added collection: ${name} (${dirPath})`);
   } catch (err) {
-    console.error(`[QMD]   ✗ Failed to add collection ${name}: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(
+      `[QMD]   ✗ Failed to add collection ${name}: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
@@ -111,7 +131,7 @@ function runQMD(args: string[]): Promise<string> {
         ...process.env,
         // QMD_DB is already set in process.env
       },
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     let stdout = '';
@@ -145,6 +165,8 @@ function runQMD(args: string[]): Promise<string> {
 export function getQMDEnvironment(qmdDataDir: string): Record<string, string> {
   return {
     QMD_DB: path.join(qmdDataDir, 'qmd.db'),
-    QMD_MODELS_PATH: process.env.QMD_MODELS_PATH || path.join(process.cwd(), 'data', 'qmd', 'models'),
+    QMD_MODELS_PATH:
+      process.env.QMD_MODELS_PATH ||
+      path.join(process.cwd(), 'data', 'qmd', 'models'),
   };
 }

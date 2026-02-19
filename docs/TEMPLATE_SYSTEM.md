@@ -10,18 +10,18 @@ AgentForge now uses **AGENTS.md** as the primary instruction file, following sta
 
 The template system provides a multi-layered approach to agent context and memory, following [OpenClaw conventions](https://docs.openclaw.ai/reference/templates):
 
-| File | Purpose | Scope | Loaded At |
-|------|---------|-------|-----------|
-| `BOOTSTRAP.md` | Initial setup guide (delete after first run) | Global → Group | First session only |
-| `IDENTITY.md` | Name, nature, vibe, emoji, avatar | Global → Group | Session start |
-| `SOUL.md` | Core truths, boundaries, personality | Global → Group | Session start |
-| `AGENTS.md` | Operational guidelines & safety defaults | Global or Group | Session start |
-| `TOOLS.md` | Environment & tools reference | Global → Group | Session start |
-| `USER.md` | User preferences & context | Per-group | Session start |
-| `memory.md` | Long-term facts & patterns | Per-group | Session start |
-| `memory/YYYY-MM-DD.md` | Daily conversation logs | Per-group | Session start (today + yesterday) |
-| `HEARTBEAT.md` | Periodic task definitions | Global → Group | Background checks |
-| `memory/heartbeat-state.json` | Heartbeat execution tracking | Per-group | Automatic |
+| File                          | Purpose                                      | Scope           | Loaded At                         |
+| ----------------------------- | -------------------------------------------- | --------------- | --------------------------------- |
+| `BOOTSTRAP.md`                | Initial setup guide (delete after first run) | Global → Group  | First session only                |
+| `IDENTITY.md`                 | Name, nature, vibe, emoji, avatar            | Global → Group  | Session start                     |
+| `SOUL.md`                     | Core truths, boundaries, personality         | Global → Group  | Session start                     |
+| `AGENTS.md`                   | Operational guidelines & safety defaults     | Global or Group | Session start                     |
+| `TOOLS.md`                    | Environment & tools reference                | Global → Group  | Session start                     |
+| `USER.md`                     | User preferences & context                   | Per-group       | Session start                     |
+| `memory.md`                   | Long-term facts & patterns                   | Per-group       | Session start                     |
+| `memory/YYYY-MM-DD.md`        | Daily conversation logs                      | Per-group       | Session start (today + yesterday) |
+| `HEARTBEAT.md`                | Periodic task definitions                    | Global → Group  | Background checks                 |
+| `memory/heartbeat-state.json` | Heartbeat execution tracking                 | Per-group       | Automatic                         |
 
 ## File Hierarchy
 
@@ -78,6 +78,7 @@ This is documented in the "Session Startup" section of `AGENTS.md`.
 ### Automatic Management
 
 The `setupGroupSession()` function in `bare-metal-runner.ts`:
+
 - Syncs `BOOTSTRAP.md`, `IDENTITY.md`, `SOUL.md`, `TOOLS.md`, and `HEARTBEAT.md` from `groups/global/` to each group on every agent startup
 - Does **not** sync `AGENTS.md` — it is group-specific and managed per group
 - Ensures `AGENTS.md`, `USER.md`, and `memory.md` exist in each group workspace (creates with defaults if missing)
@@ -89,6 +90,7 @@ The `setupGroupSession()` function in `bare-metal-runner.ts`:
 ### Daily Logs
 
 Daily logs capture ephemeral context:
+
 - Conversations and interactions
 - Decisions made during the day
 - Temporary context and discoveries
@@ -101,6 +103,7 @@ The agent reads today + yesterday for recent continuity (2-day sliding window).
 ### Long-term Memory
 
 `memory.md` stores persistent facts:
+
 - Confirmed user preferences
 - Important project context
 - Recurring patterns and decisions
@@ -111,6 +114,7 @@ Update strategy: Promote facts from daily logs when patterns are confirmed.
 ### AGENTS.md
 
 The primary instruction file loaded by the agent runner:
+
 - Combined from `groups/global/AGENTS.md` (for non-main groups) and `groups/{group}/AGENTS.md`
 - Passed to the Claude SDK as a `systemPrompt.append` value
 - Template variables (e.g., `{{ASSISTANT_NAME}}`) are substituted before loading
@@ -167,6 +171,7 @@ These are synced to each group on agent startup.
 ## Future Enhancements
 
 Possible improvements:
+
 - Automatic memory log summarization (weekly/monthly summaries)
 - Memory search across historical logs
 - MCP tool for appending to daily memory

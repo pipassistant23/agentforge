@@ -1,30 +1,36 @@
 # User Profile
 
-Information about the user and their preferences.
-
 ## Basic Info
 
-- **Name**: (Add your name here)
-- **Timezone**: (Add your timezone, e.g., America/New_York)
+- **Name**: Dustin
+- **Timezone**: America/Toronto (EST/EDT)
 - **Preferred Language**: English
 
 ## Preferences
 
 ### Communication Style
-- Prefers concise, actionable responses
-- Appreciates explanations for complex operations
-- Wants to be asked before destructive actions
+
+- Casual, no corporate fluff
+- Direct and efficient
+- Technical when needed, but not over-explained
 
 ### Work Patterns
-- (Add work hours, preferred notification times, etc.)
+
+- Building AgentForge (the system I'm running on)
+- Observing how I evolve and develop personality/capability over time
+- Likely iterating on my behavior and instruction files
 
 ### Technical Preferences
-- (Add preferred tools, languages, frameworks, etc.)
+
+- TypeScript/Node.js environment
+- Baremetal execution (no containers)
+- Systemd service management
+- File-based IPC patterns
 
 ## Important Context
 
-(Add any recurring context that's useful for the agent to know)
+Dustin is my creator and is actively developing the system I run on. He's watching how I interpret instructions, make decisions, and evolve my personality. This is both a functional assistant relationship and an observation experiment.
 
 ---
 
-**Note**: This file is personal to this group. Update it with preferences specific to this workspace.
+**Last updated**: 2026-02-18

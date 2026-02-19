@@ -22,10 +22,10 @@ Returns a list of all available groups/chats, ordered by most recent activity.
 
 ```typescript
 interface AvailableGroup {
-  jid: string;              // Chat identifier (e.g., "tg:123456789")
-  name: string;             // Display name
-  lastActivity: string;     // ISO timestamp of last message
-  isRegistered: boolean;    // Whether this group is registered with AgentForge
+  jid: string; // Chat identifier (e.g., "tg:123456789")
+  name: string; // Display name
+  lastActivity: string; // ISO timestamp of last message
+  isRegistered: boolean; // Whether this group is registered with AgentForge
 }
 ```
 
@@ -39,16 +39,17 @@ Converts an array of messages into XML format for agent processing.
 interface NewMessage {
   id: string;
   chat_jid: string;
-  sender: string;           // User ID/identifier
-  sender_name: string;      // Display name
-  content: string;          // Message text
-  timestamp: string;        // ISO timestamp
-  is_from_me?: boolean;     // Whether sent by the bot
+  sender: string; // User ID/identifier
+  sender_name: string; // Display name
+  content: string; // Message text
+  timestamp: string; // ISO timestamp
+  is_from_me?: boolean; // Whether sent by the bot
   is_bot_message?: boolean; // Whether sent by another bot
 }
 ```
 
 **Output format:**
+
 ```xml
 <messages>
 <message sender="Alice" time="2024-01-01T12:00:00.000Z">Hello there</message>
@@ -74,6 +75,7 @@ const formatted = formatOutbound(channel, text);
 ```
 
 Internal tags are stripped because:
+
 - They contain agent reasoning meant for internal use only
 - They should never be sent to users
 - Different AI models may format reasoning differently
@@ -83,9 +85,9 @@ Internal tags are stripped because:
 Locates the appropriate channel for a given JID.
 
 ```typescript
-const channel = findChannel(channels, "tg:123456789");
+const channel = findChannel(channels, 'tg:123456789');
 if (channel && channel.isConnected()) {
-  await channel.sendMessage(jid, "Hello");
+  await channel.sendMessage(jid, 'Hello');
 }
 ```
 
@@ -94,7 +96,7 @@ if (channel && channel.isConnected()) {
 Routes an outbound message to the correct channel.
 
 ```typescript
-await routeOutbound(channels, "tg:123456789", "Response from agent");
+await routeOutbound(channels, 'tg:123456789', 'Response from agent');
 ```
 
 Throws `Error` if no channel owns the JID.
@@ -104,7 +106,7 @@ Throws `Error` if no channel owns the JID.
 Escapes XML special characters in message content.
 
 ```typescript
-escapeXml("Price: $50 < $75 & available");
+escapeXml('Price: $50 < $75 & available');
 // Result: "Price: $50 &lt; $75 &amp; available"
 ```
 
@@ -204,19 +206,19 @@ Spawns an agent process for a group and streams its output.
 
 ```typescript
 interface AgentInput {
-  prompt: string;           // User messages formatted as XML
-  sessionId?: string;       // Claude session ID for continuity
-  groupFolder: string;      // Which group's workspace to use
-  chatJid: string;         // Which chat this is for
-  isMain: boolean;         // Whether this is the main group
+  prompt: string; // User messages formatted as XML
+  sessionId?: string; // Claude session ID for continuity
+  groupFolder: string; // Which group's workspace to use
+  chatJid: string; // Which chat this is for
+  isMain: boolean; // Whether this is the main group
   isScheduledTask?: boolean;
 }
 
 interface AgentOutput {
   status: 'success' | 'error';
-  result: string | null;      // Agent's response (may be null for session updates)
-  newSessionId?: string;      // Updated session ID if changed
-  error?: string;             // Error message if status='error'
+  result: string | null; // Agent's response (may be null for session updates)
+  newSessionId?: string; // Updated session ID if changed
+  error?: string; // Error message if status='error'
   tokensIn?: number;
   tokensOut?: number;
   model?: string;
@@ -245,7 +247,7 @@ const output = await runContainerAgent(
     if (result.newSessionId) {
       console.log('Session updated to:', result.newSessionId);
     }
-  }
+  },
 );
 
 if (output.status === 'error') {
@@ -297,9 +299,9 @@ Write to `WORKSPACE_IPC/messages/{random}.json`:
 ```typescript
 interface IpcMessage {
   type: 'message';
-  chatJid: string;    // Target chat (e.g., 'tg:123456789')
-  text: string;       // Message to send
-  sender?: string;    // Optional: which bot/role to send as (Telegram pool only)
+  chatJid: string; // Target chat (e.g., 'tg:123456789')
+  text: string; // Message to send
+  sender?: string; // Optional: which bot/role to send as (Telegram pool only)
 }
 ```
 
@@ -314,7 +316,7 @@ const msg = {
 };
 fs.writeFileSync(
   path.join(process.env.WORKSPACE_IPC, 'messages', `msg-${Date.now()}.json`),
-  JSON.stringify(msg)
+  JSON.stringify(msg),
 );
 ```
 
@@ -328,9 +330,9 @@ Write to `WORKSPACE_IPC/tasks/{random}.json`:
 interface IpcScheduleTask {
   type: 'schedule_task';
   prompt: string;
-  targetJid: string;  // Which group to run the task for
+  targetJid: string; // Which group to run the task for
   schedule_type: 'cron' | 'interval' | 'once';
-  schedule_value: string;  // Cron expression, milliseconds, or ISO timestamp
+  schedule_value: string; // Cron expression, milliseconds, or ISO timestamp
   context_mode?: 'group' | 'isolated'; // 'group' shares session, 'isolated' uses new session
 }
 ```
@@ -416,7 +418,7 @@ Main group only:
 
 ```typescript
 {
-  type: 'refresh_groups'
+  type: 'refresh_groups';
 }
 ```
 
@@ -445,8 +447,16 @@ AgentForge uses SQLite via `better-sqlite3`. See `src/db.ts` for low-level opera
 
 ```typescript
 function storeMessage(msg: NewMessage): void;
-function getNewMessages(jids: string[], since: string, excludeSender: string): { messages: NewMessage[], newTimestamp: string };
-function getMessagesSince(jid: string, since: string, excludeSender: string): NewMessage[];
+function getNewMessages(
+  jids: string[],
+  since: string,
+  excludeSender: string,
+): { messages: NewMessage[]; newTimestamp: string };
+function getMessagesSince(
+  jid: string,
+  since: string,
+  excludeSender: string,
+): NewMessage[];
 ```
 
 ### Scheduled Tasks
@@ -566,6 +576,7 @@ TELEGRAM_BOT_POOL=<token1>,<token2>  # Comma-separated for agent swarms
 ### Common Patterns
 
 **No channel for JID:**
+
 ```typescript
 const channel = findChannel(channels, jid);
 if (!channel) {
@@ -576,6 +587,7 @@ if (!channel) {
 
 **Agent timeout:**
 When an agent doesn't produce output within `AGENT_TIMEOUT`, it's killed with SIGKILL and the orchestrator receives:
+
 ```typescript
 {
   status: 'error',
@@ -585,6 +597,7 @@ When an agent doesn't produce output within `AGENT_TIMEOUT`, it's killed with SI
 
 **IPC authorization failure:**
 IPC requests that violate authorization rules are logged and silently dropped:
+
 ```
 Unauthorized schedule_task attempt blocked
 ```
@@ -614,12 +627,14 @@ LOG_LEVEL=debug npm start
 ```
 
 This logs:
+
 - All message routing decisions
 - IPC file processing
 - Agent process lifecycle
 - Channel events
 
 For even more detail:
+
 ```bash
 LOG_LEVEL=trace npm start
 ```

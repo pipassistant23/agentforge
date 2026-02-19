@@ -94,12 +94,12 @@ AgentForge 1.0.0 is a significant departure from the NanoClaw architecture. A di
 
 Key differences:
 
-| Area | NanoClaw | AgentForge 1.0.0 |
-|------|----------|-----------------|
-| Platform | macOS only | Linux (systemd) |
-| Execution | Apple Container (VM) | Baremetal Node.js |
-| Messaging | WhatsApp (Baileys) | Telegram (grammY) |
-| Service | launchd plist | systemd unit |
+| Area              | NanoClaw                  | AgentForge 1.0.0    |
+| ----------------- | ------------------------- | ------------------- |
+| Platform          | macOS only                | Linux (systemd)     |
+| Execution         | Apple Container (VM)      | Baremetal Node.js   |
+| Messaging         | WhatsApp (Baileys)        | Telegram (grammY)   |
+| Service           | launchd plist             | systemd unit        |
 | Agent entry point | `container/agent-runner/` | `agent-runner-src/` |
 
 To migrate:

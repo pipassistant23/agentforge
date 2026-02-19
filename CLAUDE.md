@@ -7,6 +7,7 @@ Personal Claude assistant running on Linux. Forked from NanoClaw with baremetal 
 AgentForge uses **AGENTS.md** as the primary instruction file for agents (not CLAUDE.md). This follows the emerging standard used by other AI coding tools.
 
 **File structure:**
+
 - `groups/{name}/AGENTS.md` - Main instruction file (capabilities, guidelines)
 - `groups/{name}/SOUL.md` - Identity and behavioral boundaries
 - `groups/{name}/TOOLS.md` - Environment and tool reference
@@ -22,23 +23,24 @@ Single Node.js process that connects to Telegram, routes messages to Claude Agen
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| `src/index.ts` | Orchestrator: state, message loop, agent invocation |
-| `src/channels/telegram.ts` | Telegram connection, bot pool for Agent Swarms |
-| `src/bare-metal-runner.ts` | Spawns agent as baremetal Node.js processes |
-| `src/ipc.ts` | IPC watcher, task processing, pool message routing |
-| `src/router.ts` | Message formatting and routing |
-| `src/config.ts` | Trigger pattern, paths, intervals |
-| `src/task-scheduler.ts` | Runs scheduled tasks |
-| `src/db.ts` | SQLite operations |
-| `groups/{name}/AGENTS.md` | Per-group instructions (isolated) |
-| `groups/global/AGENTS.md` | Agent Teams instructions and global settings |
+| File                             | Purpose                                                   |
+| -------------------------------- | --------------------------------------------------------- |
+| `src/index.ts`                   | Orchestrator: state, message loop, agent invocation       |
+| `src/channels/telegram.ts`       | Telegram connection, bot pool for Agent Swarms            |
+| `src/bare-metal-runner.ts`       | Spawns agent as baremetal Node.js processes               |
+| `src/ipc.ts`                     | IPC watcher, task processing, pool message routing        |
+| `src/router.ts`                  | Message formatting and routing                            |
+| `src/config.ts`                  | Trigger pattern, paths, intervals                         |
+| `src/task-scheduler.ts`          | Runs scheduled tasks                                      |
+| `src/db.ts`                      | SQLite operations                                         |
+| `groups/{name}/AGENTS.md`        | Per-group instructions (isolated)                         |
+| `groups/global/AGENTS.md`        | Agent Teams instructions and global settings              |
 | `agent-runner-src/dist/index.js` | Baremetal agent entry point (source in agent-runner-src/) |
 
 ## Features
 
 **Current Setup:**
+
 - ✅ Telegram-only (simplified from multi-channel)
 - ✅ Agent Swarm support via bot pool (sub-agents get unique bot identities)
 - ✅ Baremetal execution (no containers)
@@ -74,6 +76,7 @@ Environment variables loaded from the project root `.env` file via EnvironmentFi
 ## Agent Execution
 
 Agents spawn as baremetal Node.js processes via `node agent-runner-src/dist/index.js`:
+
 - Isolated `/data/groups/{groupFolder}/` directories
 - File-based IPC in `/data/ipc/{groupFolder}/`
 - Per-group AGENTS.md instructions and memory system

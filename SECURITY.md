@@ -27,6 +27,7 @@ We aim to respond to security reports within 48 hours.
 **CVSS:** Various tar vulnerabilities (file overwrite, symlink poisoning, path traversal)
 
 **Mitigations:**
+
 - These vulnerabilities affect the `tar` package used during build/installation
 - They do **not** affect AgentForge's runtime security
 - The `tar` package is not used in production code
@@ -35,6 +36,7 @@ We aim to respond to security reports within 48 hours.
 - Main orchestrator does not include this dependency (isolated to agent-runner)
 
 **Tracking:**
+
 - Upstream fix required in `@tobilu/qmd` package
 - Monitoring: https://github.com/advisories/GHSA-8qq5-rm4j-mr97
 - Alternative QMD implementations may be considered in future releases
@@ -100,6 +102,7 @@ AgentForge v1.0.0 includes the following security enhancements:
 ## Changelog
 
 ### v1.0.0 (2026-02-18)
+
 - Initial security hardening
 - Path traversal prevention
 - Secrets isolation

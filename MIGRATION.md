@@ -11,9 +11,11 @@ AgentForge has migrated from CLAUDE.md to AGENTS.md as the primary instruction f
 ## What Changed
 
 ### Before
+
 - `groups/{name}/CLAUDE.md` - Primary instruction file
 
-### After  
+### After
+
 - `groups/{name}/AGENTS.md` - Primary instruction file
 - `groups/{name}/SOUL.md` - Identity and behavioral boundaries (synced from global)
 - `groups/{name}/TOOLS.md` - Environment reference (synced from global)

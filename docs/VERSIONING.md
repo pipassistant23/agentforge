@@ -73,11 +73,11 @@ Pre-release versions signal instability. They are appended to the base version w
 MAJOR.MINOR.PATCH-LABEL.N
 ```
 
-| Label | Meaning | Example |
-|-------|---------|---------|
-| `alpha` | Early preview; may be incomplete or broken | `2.0.0-alpha.1` |
-| `beta` | Feature-complete; known issues may exist | `2.0.0-beta.1` |
-| `rc` | Release candidate; no known blocking issues | `2.0.0-rc.1` |
+| Label   | Meaning                                     | Example         |
+| ------- | ------------------------------------------- | --------------- |
+| `alpha` | Early preview; may be incomplete or broken  | `2.0.0-alpha.1` |
+| `beta`  | Feature-complete; known issues may exist    | `2.0.0-beta.1`  |
+| `rc`    | Release candidate; no known blocking issues | `2.0.0-rc.1`    |
 
 Rules:
 
@@ -129,14 +129,14 @@ git tag --list 'v*' --sort=-version:refname | head -10
 
 The following are considered public interface and must not break across MINOR and PATCH releases:
 
-| Interface | Notes |
-|-----------|-------|
-| `.env` variable names | New optional variables may be added; existing names must not be renamed |
-| `groups/{name}/AGENTS.md` file location | Agents depend on this path for group instructions |
-| `groups/global/AGENTS.md`, `SOUL.md`, `TOOLS.md` file locations | Global template files synced to each group |
-| Systemd unit name `agentforge.service` | Users configure this in scripts |
-| IPC directory structure under `/data/ipc/` | Agent runner reads from here |
-| `npm run build` / `npm test` / `npm start` scripts | Documented developer commands |
+| Interface                                                       | Notes                                                                   |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `.env` variable names                                           | New optional variables may be added; existing names must not be renamed |
+| `groups/{name}/AGENTS.md` file location                         | Agents depend on this path for group instructions                       |
+| `groups/global/AGENTS.md`, `SOUL.md`, `TOOLS.md` file locations | Global template files synced to each group                              |
+| Systemd unit name `agentforge.service`                          | Users configure this in scripts                                         |
+| IPC directory structure under `/data/ipc/`                      | Agent runner reads from here                                            |
+| `npm run build` / `npm test` / `npm start` scripts              | Documented developer commands                                           |
 
 ### What Is Internal and May Change
 

@@ -33,6 +33,7 @@ If brew/nvm aren't installed, install them first (`/bin/bash -c "$(curl -fsSL ht
 Run `./.claude/skills/setup/scripts/02-install-deps.sh` and parse the status block.
 
 **If failed:** Read the tail of `logs/setup.log` to diagnose. Common fixes to try automatically:
+
 1. Delete `node_modules` and `package-lock.json`, then re-run the script
 2. If permission errors: suggest running with corrected permissions
 3. If specific package fails to build (native modules like better-sqlite3): install build tools (`xcode-select --install` on macOS, `build-essential` on Linux), then retry
@@ -63,6 +64,7 @@ grep -q 'container system status' src/index.ts && echo "NEEDS_CONVERSION" || ech
 ```
 
 Check these three files for Apple Container references:
+
 - `src/index.ts` — look for `container system status` or `ensureContainerSystemRunning`
 - `src/container-runner.ts` — look for `spawn('container'`
 - `container/build.sh` — look for `container build`
@@ -76,6 +78,7 @@ Check these three files for Apple Container references:
 Run `./.claude/skills/setup/scripts/03-setup-container.sh --runtime <chosen>` and parse the status block.
 
 **If BUILD_OK=false:** Read `logs/setup.log` tail for the build error.
+
 - If it's a cache issue (stale layers): run `container builder stop && container builder rm && container builder start` (Apple Container) or `docker builder prune -f` (Docker), then retry.
 - If Dockerfile syntax or missing files: diagnose from the log and fix.
 - Retry the build script after fixing.
@@ -89,6 +92,7 @@ If HAS_ENV=true from step 1, read `.env` and check if it already has `CLAUDE_COD
 AskUserQuestion: Claude subscription (Pro/Max) vs Anthropic API key?
 
 **Subscription:** Tell the user:
+
 1. Open another terminal and run: `claude setup-token`
 2. Copy the token it outputs
 3. Add it to the `.env` file in the project root: `CLAUDE_CODE_OAUTH_TOKEN=<token>`
@@ -111,6 +115,7 @@ AskUserQuestion: QR code in browser (recommended) vs pairing code vs QR code in 
 If AUTH_STATUS=already_authenticated → skip ahead.
 
 **If failed:**
+
 - qr_timeout → QR expired. Automatically re-run the auth script to generate a fresh QR. Tell user a new QR is ready.
 - logged_out → Delete `store/auth/` and re-run auth automatically.
 - 515 → Stream error during pairing. The auth script handles reconnection, but if it persists, re-run the auth script.
@@ -128,10 +133,12 @@ AskUserQuestion: What trigger word? (default: Andy). In group chats, messages st
 AskUserQuestion: Main channel type? (options depend on phone number setup)
 
 **If bot shares user's number (same phone):**
+
 1. Self-chat (chat with yourself) — Recommended. You message yourself and the bot responds.
 2. Solo group (just you) — A group where you're the only member. Good if you want message history separate from self-chat.
 
 **If bot has its own dedicated phone number:**
+
 1. DM with the bot — Recommended. You message the bot's number directly.
 2. Solo group with the bot — A group with just you and the bot, no one else.
 
@@ -144,6 +151,7 @@ Do NOT show options that don't apply to the user's setup. For example, don't off
 **For DM with bot's dedicated number:** Ask for the bot's phone number, construct JID as `NUMBER@s.whatsapp.net`.
 
 **For group (solo or with bot):**
+
 1. Run `./.claude/skills/setup/scripts/05-sync-groups.sh` (Bash timeout: 60000ms)
 2. **If BUILD=failed:** Read `logs/setup.log`, fix the TypeScript error, re-run.
 3. **If GROUPS_IN_DB=0:** Check `logs/setup.log` for the sync output. Common causes: WhatsApp auth expired (re-run step 5), connection timeout (re-run sync script with longer timeout).
@@ -153,6 +161,7 @@ Do NOT show options that don't apply to the user's setup. For example, don't off
 ## 8. Register Channel
 
 Run `./.claude/skills/setup/scripts/06-register-channel.sh` with args:
+
 - `--jid "JID"` — from step 7
 - `--name "main"` — always "main" for the first channel
 - `--trigger "@TriggerWord"` — from step 6
@@ -179,6 +188,7 @@ If the service is already running (check `launchctl list | grep nanoclaw` on mac
 Run `./.claude/skills/setup/scripts/08-setup-service.sh` and parse the status block.
 
 **If SERVICE_LOADED=false:**
+
 - Read `logs/setup.log` for the error.
 - Common fix: plist already loaded with different path. Unload the old one first, then re-run.
 - On macOS: check `launchctl list | grep nanoclaw` to see if it's loaded with an error status. If the PID column is `-` and the status column is non-zero, the service is crashing. Read `logs/nanoclaw.error.log` for the crash reason and fix it (common: wrong Node path, missing .env, missing auth).
@@ -190,6 +200,7 @@ Run `./.claude/skills/setup/scripts/08-setup-service.sh` and parse the status bl
 Run `./.claude/skills/setup/scripts/09-verify.sh` and parse the status block.
 
 **If STATUS=failed, fix each failing component:**
+
 - SERVICE=stopped → run `npm run build` first, then restart: `launchctl kickstart -k gui/$(id -u)/com.nanoclaw` (macOS) or `systemctl --user restart nanoclaw` (Linux). Re-check.
 - SERVICE=not_found → re-run step 10.
 - CREDENTIALS=missing → re-run step 4.

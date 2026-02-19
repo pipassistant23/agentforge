@@ -71,3 +71,14 @@ export const TELEGRAM_BOT_POOL = (process.env.TELEGRAM_BOT_POOL || '')
   .split(',')
   .map((t) => t.trim())
   .filter(Boolean);
+
+// Email (Gmail) channel configuration
+export const GMAIL_USER = process.env.GMAIL_USER || '';
+export const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';
+export const GMAIL_TRIGGER_LABEL =
+  process.env.GMAIL_TRIGGER_LABEL || 'AgentForge';
+export const GMAIL_TRIGGER_SUBJECT = process.env.GMAIL_TRIGGER_SUBJECT || '';
+export const GMAIL_POLL_INTERVAL = parseInt(
+  process.env.GMAIL_POLL_INTERVAL || '60000',
+  10,
+);

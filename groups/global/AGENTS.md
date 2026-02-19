@@ -42,6 +42,7 @@ Throughout these instructions, `{{ASSISTANT_NAME}}` is replaced with the actual 
 ## Shared Resources
 
 The `/workspace/global/` directory contains:
+
 - Shared utilities and scripts
 - Common configurations
 - Team-wide instructions (for Agent Swarms)
@@ -53,6 +54,7 @@ When using the bot pool feature (`TELEGRAM_BOT_POOL`), sub-agents spawned during
 ### Team Coordination
 
 When working as a team:
+
 1. **Main agent** coordinates and delegates
 2. **Sub-agents** execute specific tasks
 3. Each agent reports back via their bot identity
@@ -61,18 +63,21 @@ When working as a team:
 ## Best Practices
 
 ### Security
+
 - Never expose API keys or tokens in chat messages
 - Validate user input before executing commands
 - Use parameterized database queries to prevent SQL injection
 - Be cautious with file operations outside workspace
 
 ### Performance
+
 - Clean up large temporary files after use
 - Avoid infinite loops or unbounded operations
 - Use streaming for large outputs
 - Limit memory usage (agent processes have resource limits)
 
 ### Communication
+
 - Be concise and clear
 - Use formatting (markdown) for readability
 - Acknowledge long-running tasks immediately
@@ -81,24 +86,28 @@ When working as a team:
 ## Safety Defaults
 
 ### File Operations
+
 - **NEVER** dump entire directories with recursive `ls -R` or `find`
 - Always check file sizes before reading (avoid OOM on large files)
 - Use targeted reads with `head`, `tail`, or line limits
 - Confirm before deleting files or directories
 
 ### Command Execution
+
 - **NEVER** run destructive commands without explicit user consent
 - Validate inputs before passing to shell commands (prevent injection)
 - Use `--dry-run` or preview mode when available
 - Explain what a command will do before running it
 
 ### External Communication
+
 - **DO NOT** stream replies directly to external channels
 - Buffer complete responses before sending
 - Strip `<internal>` tags before sending to users
 - Validate message content and size before transmission
 
 ### Resource Management
+
 - Monitor memory usage (avoid unbounded operations)
 - Clean up temporary files after use
 - Set reasonable timeouts for long-running operations
@@ -115,6 +124,7 @@ Use `<internal>` tags for reasoning not meant for the user. These tags are strip
 ## Error Handling
 
 When encountering errors:
+
 1. Read the error message carefully
 2. Check relevant logs and state files
 3. Try alternative approaches (don't retry the same failed action)
@@ -123,6 +133,7 @@ When encountering errors:
 ## Customization
 
 Users can customize behavior by:
+
 1. Editing this file (global instructions)
 2. Editing group-specific `AGENTS.md` files
 3. Editing `SOUL.md`, `TOOLS.md`, `USER.md`
@@ -132,6 +143,7 @@ Users can customize behavior by:
 ## Troubleshooting
 
 If you encounter issues:
+
 - Check logs: `sudo journalctl -u agentforge.service -f`
 - Verify environment variables are set
 - Ensure database is accessible

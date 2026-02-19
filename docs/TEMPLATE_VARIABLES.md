@@ -15,15 +15,16 @@ You are {{ASSISTANT_NAME}}, a personal assistant.
 ```
 
 **Strict matching rules:**
+
 - `{{VARIABLE_NAME}}` ✅ Works
 - `{{ VARIABLE_NAME }}` ❌ Spaces not supported
 - `{{UNKNOWN_VAR}}` → Left as-is (not replaced)
 
 ## Supported Variables
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `{{ASSISTANT_NAME}}` | Bot/assistant name | `Andy` | `AgentForge`, `Pip`, `Assistant` |
+| Variable             | Description        | Default | Example                          |
+| -------------------- | ------------------ | ------- | -------------------------------- |
+| `{{ASSISTANT_NAME}}` | Bot/assistant name | `Andy`  | `AgentForge`, `Pip`, `Assistant` |
 
 ## Where It Works
 
@@ -66,6 +67,7 @@ Template substitution is applied to:
 ### Code Flow
 
 **Template Utility** (`agent-runner-src/src/template.ts`):
+
 ```typescript
 export function substituteVariables(content: string): string {
   const vars = {
@@ -79,6 +81,7 @@ export function substituteVariables(content: string): string {
 ```
 
 **Agent Runner** (`agent-runner-src/src/index.ts`):
+
 ```typescript
 import { substituteVariables } from './template.js';
 
@@ -102,11 +105,13 @@ if (fs.existsSync(groupAgentsMdPath)) {
 Change one environment variable to rebrand the entire application:
 
 **1. Edit `.env`:**
+
 ```bash
 ASSISTANT_NAME=AgentForge
 ```
 
 **2. Rebuild and restart:**
+
 ```bash
 npm run build
 cd agent-runner-src && npm run build
@@ -115,6 +120,7 @@ sudo systemctl restart agentforge.service
 ```
 
 **3. Verify:**
+
 ```bash
 sudo journalctl -u agentforge.service -f
 # Look for: "AgentForge running (trigger: @AgentForge)"
@@ -122,12 +128,12 @@ sudo journalctl -u agentforge.service -f
 
 ### What Changes
 
-| Component | Before | After |
-|-----------|--------|-------|
-| **Agent identity** | "You are Andy..." | "You are AgentForge..." |
-| **Trigger pattern** | `@YourBot` | `@AgentForge` |
-| **Transcripts** | "Andy: Hello" | "AgentForge: Hello" |
-| **Code references** | Uses `ASSISTANT_NAME` | Uses `ASSISTANT_NAME` |
+| Component           | Before                | After                   |
+| ------------------- | --------------------- | ----------------------- |
+| **Agent identity**  | "You are Andy..."     | "You are AgentForge..." |
+| **Trigger pattern** | `@YourBot`            | `@AgentForge`           |
+| **Transcripts**     | "Andy: Hello"         | "AgentForge: Hello"     |
+| **Code references** | Uses `ASSISTANT_NAME` | Uses `ASSISTANT_NAME`   |
 
 ### What Doesn't Change
 
@@ -162,12 +168,14 @@ Result: Trigger becomes `@Jarvis`, identity becomes "Jarvis"
 Deploy multiple bots with different names:
 
 **Instance 1:**
+
 ```bash
 ASSISTANT_NAME=DevBot
 TELEGRAM_BOT_TOKEN=token1
 ```
 
 **Instance 2:**
+
 ```bash
 ASSISTANT_NAME=ProdBot
 TELEGRAM_BOT_TOKEN=token2
@@ -186,9 +194,9 @@ TELEGRAM_BOT_TOKEN=token2
 ### Malformed Syntax
 
 ```markdown
-{{ ASSISTANT_NAME }}  ← Spaces not matched
+{{ ASSISTANT_NAME }} ← Spaces not matched
 {{ASSISTANT_NAME      ← Missing closing brace
-ASSISTANT_NAME}}      ← Missing opening braces
+ASSISTANT_NAME}} ← Missing opening braces
 ```
 
 **Result:** All left as-is (not replaced)
@@ -237,6 +245,7 @@ console.log(result); // "Hello, I am TestBot"
 Potential additions for future versions:
 
 1. **More Variables:**
+
    ```markdown
    {{GROUP_NAME}} - Current group name
    {{GROUP_FOLDER}} - Current group folder
@@ -244,6 +253,7 @@ Potential additions for future versions:
    ```
 
 2. **Conditional Templates:**
+
    ```markdown
    {{#if IS_MAIN}}
    You have admin privileges.
@@ -251,11 +261,13 @@ Potential additions for future versions:
    ```
 
 3. **Default Values:**
+
    ```markdown
    {{ASSISTANT_NAME:DefaultBot}}
    ```
 
 4. **Escape Sequences:**
+
    ```markdown
    \{{LITERAL_BRACES}}
    ```
@@ -291,6 +303,7 @@ Potential additions for future versions:
 **Symptom:** Agent still says "You are Andy" after changing `.env`
 
 **Solution:**
+
 1. Verify `.env` has `ASSISTANT_NAME=NewName` (no quotes)
 2. Rebuild: `npm run build && cd agent-runner-src && npm run build`
 3. Restart: `sudo systemctl restart agentforge.service`
@@ -301,6 +314,7 @@ Potential additions for future versions:
 **Symptom:** `{{ASSISTANT_NAME}}` appears literally in agent output
 
 **Solution:**
+
 1. Check for spaces: Use `{{VAR}}` not `{{ VAR }}`
 2. Verify spelling: Must be exactly `ASSISTANT_NAME`
 3. Check file: `grep '{{ASSISTANT_NAME}}' groups/global/AGENTS.md`
@@ -310,6 +324,7 @@ Potential additions for future versions:
 **Symptom:** Agent uses old name after restart
 
 **Solution:**
+
 1. Check which `.env` is loaded: `systemctl cat agentforge.service | grep EnvironmentFile`
 2. Verify file: `grep ASSISTANT_NAME .env`
 3. Check process env: `sudo journalctl -u agentforge.service | grep "trigger:"`

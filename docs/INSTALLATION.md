@@ -4,13 +4,13 @@ This guide walks you through setting up AgentForge from scratch on a Linux syste
 
 ## System Requirements
 
-| Requirement | Minimum | Notes |
-|-------------|---------|-------|
-| OS | Linux | Any modern distribution |
-| Node.js | 20.x or later | Check with `node --version` |
-| npm | 9.x or later | Included with Node.js |
-| Disk space | 500 MB | For dependencies, database, and logs |
-| RAM | 512 MB | More recommended if running multiple concurrent groups |
+| Requirement | Minimum       | Notes                                                  |
+| ----------- | ------------- | ------------------------------------------------------ |
+| OS          | Linux         | Any modern distribution                                |
+| Node.js     | 20.x or later | Check with `node --version`                            |
+| npm         | 9.x or later  | Included with Node.js                                  |
+| Disk space  | 500 MB        | For dependencies, database, and logs                   |
+| RAM         | 512 MB        | More recommended if running multiple concurrent groups |
 
 AgentForge does not use containers. All agents run as baremetal Node.js processes on the host.
 
@@ -45,6 +45,7 @@ AgentForge uses the Claude Agent SDK, which is distributed as part of [Claude Co
 ### 4. Obtain an Anthropic API Key
 
 Either:
+
 - **ANTHROPIC_API_KEY**: Get an API key from [console.anthropic.com](https://console.anthropic.com)
 - **CLAUDE_CODE_OAUTH_TOKEN**: Use the OAuth token from your Claude Code installation (check `~/.claude/.credentials.json`)
 
@@ -188,6 +189,7 @@ WantedBy=multi-user.target
 ```
 
 Make sure:
+
 - `User=` is the Linux user that owns the agentforge directory
 - `WorkingDirectory=` is the absolute path to the agentforge directory
 - `EnvironmentFile=` points to the `.env` file (also absolute path)
@@ -245,6 +247,7 @@ VALUES ('tg:YOUR_CHAT_ID', 'My Chat', 'main', '@YourAgent', datetime('now'), 0);
 ```
 
 Replace:
+
 - `tg:YOUR_CHAT_ID` with the JID from `/chatid`
 - `'My Chat'` with a display name
 - `@YourAgent` with your trigger word (must match `ASSISTANT_NAME`)

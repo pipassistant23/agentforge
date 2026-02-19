@@ -23,6 +23,7 @@ This guide covers common issues, how to diagnose them, and solutions.
 **Cause:** The Telegram bot token is not configured.
 
 **Solution:**
+
 ```bash
 # Add to .env
 TELEGRAM_BOT_TOKEN=<your_bot_token>
@@ -38,6 +39,7 @@ To get a bot token, see [INSTALLATION.md](INSTALLATION.md).
 **Symptom:** `systemctl status agentforge.service` shows it exited with code 1.
 
 **Diagnosis:**
+
 ```bash
 # Check recent logs
 sudo journalctl -u agentforge.service -n 50
@@ -49,6 +51,7 @@ sudo journalctl -u agentforge.service --no-pager -n 100 | tail -30
 **Common causes:**
 
 1. **Database corruption:**
+
    ```bash
    # Check SQLite database integrity
    sqlite3 /path/to/store/messages.db ".tables"
@@ -59,6 +62,7 @@ sudo journalctl -u agentforge.service --no-pager -n 100 | tail -30
    ```
 
 2. **Missing directories:**
+
    ```bash
    # Ensure directories exist and are writable
    mkdir -p /var/agentforge/store /var/agentforge/groups /var/agentforge/data
@@ -67,6 +71,7 @@ sudo journalctl -u agentforge.service --no-pager -n 100 | tail -30
    ```
 
 3. **Process already running:**
+
    ```bash
    # Check for zombie processes
    ps aux | grep agentforge
@@ -83,6 +88,7 @@ sudo journalctl -u agentforge.service --no-pager -n 100 | tail -30
 **Cause:** Agent runner source was not built.
 
 **Solution:**
+
 ```bash
 # Build the main project
 npm run build
@@ -103,6 +109,7 @@ sudo systemctl restart agentforge.service
 **Cause:** Another process is using the port, or the service doesn't have permissions.
 
 **Solution:**
+
 ```bash
 # Check if another bot is running
 systemctl status agentforge.service
@@ -126,6 +133,7 @@ sudo chmod 755 /var/agentforge -R
 **Symptom:** Logs show "Agent timed out after 1800000ms"
 
 **Causes:**
+
 1. Agent is genuinely slow (working on complex task)
 2. Agent is stuck in a loop
 3. Agent crashed silently
@@ -133,6 +141,7 @@ sudo chmod 755 /var/agentforge -R
 **Solution:**
 
 1. **Increase timeout for specific groups:**
+
    ```typescript
    // In IPC task registration or direct update
    {
@@ -142,6 +151,7 @@ sudo chmod 755 /var/agentforge -R
    ```
 
 2. **Check agent logs:**
+
    ```bash
    # Logs are stored per-group
    tail -f groups/main/logs/agent-*.log
@@ -152,6 +162,7 @@ sudo chmod 755 /var/agentforge -R
    ```
 
 3. **Check available memory:**
+
    ```bash
    free -h
 
@@ -164,6 +175,7 @@ sudo chmod 755 /var/agentforge -R
 **Symptom:** Agent crashes immediately or during execution.
 
 **Diagnosis:**
+
 ```bash
 # Check the agent process log
 cat groups/main/logs/agent-*.log | grep -A 20 "Stderr"
@@ -174,6 +186,7 @@ cat groups/main/logs/agent-*.log | grep -A 20 "Stderr"
 **Common causes:**
 
 1. **Missing dependencies in agent-runner:**
+
    ```bash
    cd agent-runner-src
    npm install
@@ -184,6 +197,7 @@ cat groups/main/logs/agent-*.log | grep -A 20 "Stderr"
    ```
 
 2. **Agent file is corrupted:**
+
    ```bash
    # Rebuild
    npm run build
@@ -193,6 +207,7 @@ cat groups/main/logs/agent-*.log | grep -A 20 "Stderr"
    ```
 
 3. **Node version mismatch:**
+
    ```bash
    # Check required version
    grep "engines" package.json
@@ -208,6 +223,7 @@ cat groups/main/logs/agent-*.log | grep -A 20 "Stderr"
 **Symptom:** Messages are stored but agent never processes them.
 
 **Diagnosis:**
+
 ```bash
 # Check if messages are in the database
 sqlite3 store/messages.db "SELECT COUNT(*) FROM messages;"
@@ -227,6 +243,7 @@ sqlite3 store/messages.db "SELECT * FROM router_state;"
    - See [INSTALLATION.md](INSTALLATION.md) for details
 
 2. **Trigger pattern not matching:**
+
    ```bash
    # Check configured trigger
    echo $TRIGGER_PATTERN
@@ -237,6 +254,7 @@ sqlite3 store/messages.db "SELECT * FROM router_state;"
    ```
 
 3. **Agent process never started:**
+
    ```bash
    # Check if processes are registered in queue
    # Enable debug logging and watch
@@ -254,6 +272,7 @@ sqlite3 store/messages.db "SELECT * FROM router_state;"
 **Symptom:** Agent writes IPC files but messages don't arrive.
 
 **Diagnosis:**
+
 ```bash
 # Check if IPC files exist
 ls -la data/ipc/*/messages/
@@ -267,6 +286,7 @@ sudo journalctl -u agentforge.service | grep "IPC"
 
 1. **IPC directory doesn't exist:**
    Agent assumes `WORKSPACE_IPC` directory exists:
+
    ```bash
    # Check
    echo $WORKSPACE_IPC
@@ -278,6 +298,7 @@ sudo journalctl -u agentforge.service | grep "IPC"
    ```
 
 2. **Files have parse errors:**
+
    ```bash
    # Check error directory
    ls -la data/ipc/errors/
@@ -290,6 +311,7 @@ sudo journalctl -u agentforge.service | grep "IPC"
    ```
 
 3. **Authorization denied:**
+
    ```bash
    # Check logs for "Unauthorized"
    sudo journalctl -u agentforge.service | grep -i "unauthorized"
@@ -299,6 +321,7 @@ sudo journalctl -u agentforge.service | grep "IPC"
    ```
 
 4. **IPC poll interval too slow:**
+
    ```bash
    # Check configuration
    echo $IPC_POLL_INTERVAL  # Should be 1000 or less
@@ -313,6 +336,7 @@ sudo journalctl -u agentforge.service | grep "IPC"
 **Symptom:** Written task files move to error directory instead of executing.
 
 **Diagnosis:**
+
 ```bash
 # Check error log
 cat data/ipc/errors/main-task-*.json | jq .
@@ -324,6 +348,7 @@ sudo journalctl -u agentforge.service | grep "task"
 **Common issues:**
 
 1. **Invalid cron expression:**
+
    ```bash
    # Valid cron: "0 9 * * *" (daily at 9 AM)
    # Invalid cron: "every morning"
@@ -333,6 +358,7 @@ sudo journalctl -u agentforge.service | grep "task"
    ```
 
 2. **Invalid JID format:**
+
    ```bash
    # Valid: "tg:123456789"
    # Invalid: "telegram:123456789" or just "123456789"
@@ -353,6 +379,7 @@ sudo journalctl -u agentforge.service | grep "task"
 **Symptom:** `systemctl status` or `top` shows high memory usage.
 
 **Diagnosis:**
+
 ```bash
 # Check memory per process
 ps aux | grep agentforge | grep -v grep
@@ -367,6 +394,7 @@ watch -n 5 'ps aux | grep "node dist"'
 **Solutions:**
 
 1. **Reduce concurrent processes:**
+
    ```bash
    # Edit .env
    MAX_CONCURRENT_PROCESSES=2  # Was 5
@@ -376,12 +404,14 @@ watch -n 5 'ps aux | grep "node dist"'
    ```
 
 2. **Clear old logs:**
+
    ```bash
    # Logs accumulate in groups/*/logs/
    find groups -name "agent-*.log" -mtime +30 -delete
    ```
 
 3. **Optimize database:**
+
    ```bash
    # Clean up old messages (keep last 1000)
    sqlite3 store/messages.db "DELETE FROM messages WHERE timestamp < (SELECT timestamp FROM messages ORDER BY timestamp DESC LIMIT 1 OFFSET 1000);"
@@ -391,6 +421,7 @@ watch -n 5 'ps aux | grep "node dist"'
    ```
 
 4. **Check for agent process leaks:**
+
    ```bash
    # Processes should be cleaned up after task completes
    ps aux | grep node
@@ -413,12 +444,14 @@ watch -n 5 'ps aux | grep "node dist"'
 **Diagnosis:**
 
 1. **Check message storage:**
+
    ```bash
    sqlite3 store/messages.db \
      "SELECT sender_name, content, timestamp FROM messages WHERE chat_jid='tg:123456789' ORDER BY timestamp DESC LIMIT 5;"
    ```
 
 2. **Check trigger pattern:**
+
    ```bash
    # Messages to non-main groups need trigger
    # Trigger pattern: ^@{ASSISTANT_NAME}\b (case-insensitive)
@@ -444,6 +477,7 @@ watch -n 5 'ps aux | grep "node dist"'
 **Cause:** JID mismatch or routing error.
 
 **Diagnosis:**
+
 ```bash
 # Get the correct JID for a chat
 # Send /chatid command to bot in the chat
@@ -461,6 +495,7 @@ sqlite3 store/messages.db \
 **Note:** Typing indicators are optional. Only some channels support them.
 
 **Solution:**
+
 ```bash
 # Telegram supports typing indicator
 # If it's not showing, check channel implementation
@@ -479,6 +514,7 @@ LOG_LEVEL=debug sudo journalctl -u agentforge.service -f
 **Symptom:** Errors about "database disk image malformed"
 
 **Solution:**
+
 ```bash
 # Backup current database
 cp store/messages.db store/messages.db.backup
@@ -504,6 +540,7 @@ sudo systemctl restart agentforge.service
 **Solutions:**
 
 1. **Reduce polling frequency:**
+
    ```bash
    # Increase intervals so DB isn't hammered
    POLL_INTERVAL=5000        # 5 seconds
@@ -514,6 +551,7 @@ sudo systemctl restart agentforge.service
    ```
 
 2. **Add database indexes:**
+
    ```bash
    # If messages table is huge, index by timestamp
    sqlite3 store/messages.db "CREATE INDEX IF NOT EXISTS idx_chat_time ON messages(chat_jid, timestamp);"
@@ -541,6 +579,7 @@ LOG_LEVEL=trace npm start
 ```
 
 Debug output includes:
+
 - Message routing decisions
 - IPC file processing
 - Channel events
@@ -681,6 +720,7 @@ If you're stuck:
    - [API.md](API.md) - Code reference
 
 2. **Collect debug information:**
+
    ```bash
    # Gather system info
    systemctl status agentforge.service > debug.txt
@@ -692,6 +732,7 @@ If you're stuck:
    ```
 
 3. **Check agent logs:**
+
    ```bash
    # Provide the most recent agent log
    ls -t groups/main/logs/ | head -1 | xargs -I {} cat groups/main/logs/{}

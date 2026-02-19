@@ -8,35 +8,42 @@
 ## 🛡️ Critical Security Fixes (5 Vulnerabilities Patched)
 
 ### CRIT-1: Path Traversal Prevention
+
 **File:** `src/ipc.ts`  
 **Fix:** Added strict folder name validation with regex `/^[a-z0-9][a-z0-9_-]*$/`  
 **Impact:** Prevents malicious agents from accessing files outside their workspace via `../` sequences
 
 ### CRIT-2: Input Validation on Group Registration
+
 **File:** `src/ipc.ts`  
 **Fix:** Added comprehensive validation for `register_group` IPC messages:
+
 - JID format validation (Telegram: `tg:-12345`, WhatsApp: `user@s.whatsapp.net`)
 - Folder name sanitization
 - Name length limits (max 100 chars)
-**Impact:** Prevents injection attacks and malformed group registrations
+  **Impact:** Prevents injection attacks and malformed group registrations
 
 ### CRIT-3: Secrets Isolation
+
 **File:** `src/bare-metal-runner.ts`  
 **Fix:** Replaced `...process.env` with explicit allowlist of environment variables  
 **Impact:** Agent processes no longer inherit `TELEGRAM_BOT_TOKEN` and other sensitive credentials
 
 ### CRIT-4: Promise Rejection Handling
+
 **File:** `src/bare-metal-runner.ts`  
 **Fix:** Added `.catch()` handlers to all `outputChain` promise chains  
 **Impact:** Prevents unhandled rejections from hanging the message queue indefinitely
 
 ### CRIT-5: Process Spawn Error Handling
+
 **File:** `src/bare-metal-runner.ts`  
-**Fix:** 
+**Fix:**
+
 - Added `agentProcess.on('error')` handler
 - Added stdin null checks before writing
 - Wrapped stdin operations in try-catch
-**Impact:** Gracefully handles spawn failures instead of crashing with unhandled exceptions
+  **Impact:** Gracefully handles spawn failures instead of crashing with unhandled exceptions
 
 ---
 
@@ -78,6 +85,7 @@
 ## 🧹 Cleanup Completed
 
 ### Files Removed
+
 - Old log files cleared
 - Legacy database files removed (`pipbot.db`, `registered_groups.json.migrated`)
 - IPC message queue cleared
@@ -85,6 +93,7 @@
 - Memory and conversation files reset
 
 ### Git Status
+
 - 5 new workflow files
 - 7 new documentation files
 - 3 security-patched source files
@@ -96,6 +105,7 @@
 ## ✅ Quality Validation
 
 ### Test Results
+
 ```
 Test Files: 5 passed (5 total)
 Tests: 109 passed (109 total)
@@ -104,6 +114,7 @@ TypeScript: ✅ No errors
 ```
 
 ### Code Coverage
+
 - IPC authorization: ✅ 32 tests
 - Database operations: ✅ 18 tests
 - Message formatting: ✅ 44 tests
@@ -140,11 +151,13 @@ TypeScript: ✅ No errors
 ## 📋 Next Steps for Release
 
 1. **Review changes:**
+
    ```bash
    git diff --staged
    ```
 
 2. **Commit changes:**
+
    ```bash
    git commit -m "chore: prepare for v1.0.0 release
 
@@ -160,11 +173,13 @@ TypeScript: ✅ No errors
    ```
 
 3. **Tag release:**
+
    ```bash
    git tag -a v1.0.0 -m "Release v1.0.0 - First stable release"
    ```
 
 4. **Push to GitHub:**
+
    ```bash
    git push origin main
    git push origin v1.0.0
@@ -184,6 +199,7 @@ TypeScript: ✅ No errors
 > AgentForge transforms a Linux server into an intelligent AI assistant accessible via Telegram (with WhatsApp support available). Each group chat gets isolated workspaces, persistent memory, and the ability to schedule autonomous tasks.
 >
 > **Key Features:**
+>
 > - 🔒 Baremetal execution with filesystem isolation
 > - 🤖 Agent Swarms (multi-bot coordination)
 > - 📅 Task scheduling (cron, intervals, one-time)
@@ -193,6 +209,7 @@ TypeScript: ✅ No errors
 > - 📚 Full documentation suite
 >
 > **Security:** This release includes critical security hardening:
+>
 > - Path traversal prevention
 > - Input validation on all IPC messages
 > - Secrets isolation from agent processes
@@ -214,4 +231,3 @@ TypeScript: ✅ No errors
 **Prepared by:** Automated pre-release validation  
 **Reviewed by:** Awaiting human approval  
 **Ready for deployment:** ✅ YES
-

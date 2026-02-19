@@ -13,6 +13,11 @@ import path from 'path';
 import {
   ASSISTANT_NAME,
   DATA_DIR,
+  GMAIL_APP_PASSWORD,
+  GMAIL_POLL_INTERVAL,
+  GMAIL_TRIGGER_LABEL,
+  GMAIL_TRIGGER_SUBJECT,
+  GMAIL_USER,
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   POLL_INTERVAL,
@@ -21,6 +26,7 @@ import {
   TRIGGER_PATTERN,
 } from './config.js';
 import { TelegramChannel, initBotPool } from './channels/telegram.js';
+import { EmailChannel } from './channels/email.js';
 import {
   AgentOutput,
   runContainerAgent,
@@ -554,6 +560,29 @@ async function main(): Promise<void> {
   const telegram = new TelegramChannel(TELEGRAM_BOT_TOKEN, channelOpts);
   channels.push(telegram);
   await telegram.connect();
+
+  // Initialize email channel if configured
+  if (GMAIL_USER && GMAIL_APP_PASSWORD) {
+    try {
+      const email = new EmailChannel({
+        gmailUser: GMAIL_USER,
+        appPassword: GMAIL_APP_PASSWORD,
+        triggerLabel: GMAIL_TRIGGER_LABEL,
+        triggerSubject: GMAIL_TRIGGER_SUBJECT || undefined,
+        pollIntervalMs: GMAIL_POLL_INTERVAL,
+        ...channelOpts,
+        registerGroup,
+      });
+      channels.push(email);
+      await email.connect();
+      logger.info('Email channel connected');
+    } catch (err) {
+      logger.error(
+        { err },
+        'Failed to connect email channel — continuing without it',
+      );
+    }
+  }
 
   // Initialize bot pool for agent swarms
   if (TELEGRAM_BOT_POOL.length > 0) {

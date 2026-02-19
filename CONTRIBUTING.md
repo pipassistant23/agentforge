@@ -41,7 +41,6 @@ Every pull request that changes source code (i.e., anything under `src/` or `age
 1. Open `CHANGELOG.md`.
 2. Find the `## [Unreleased]` section at the top.
 3. Add a concise, present-tense bullet point under the appropriate subsection:
-
    - **Added** - a new feature or behavior
    - **Changed** - a change to existing behavior
    - **Deprecated** - something that will be removed in a future release
@@ -76,6 +75,7 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) format u
 Common types: `feat`, `fix`, `docs`, `chore`, `test`, `ci`, `security`, `refactor`.
 
 Examples:
+
 - `fix: prevent infinite message replay on container timeout`
 - `feat: add requiresTrigger option per registered group`
 - `docs: correct systemd restart command in RELEASE_PROCESS.md`

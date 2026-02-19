@@ -20,11 +20,13 @@ This guide explains how to set up your development environment, build the projec
 ### Prerequisites
 
 - **Node.js 20+**
+
   ```bash
   node --version  # Should be v20 or higher
   ```
 
 - **npm 10+**
+
   ```bash
   npm --version
   ```
@@ -121,17 +123,17 @@ agentforge/
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `src/index.ts` | Main loop, state management, group processing |
-| `src/router.ts` | Message formatting, XML escaping, channel routing |
-| `src/types.ts` | TypeScript interfaces for all major types |
-| `src/config.ts` | Environment configuration (read-only) |
-| `src/db.ts` | SQLite operations, schema, migrations |
-| `src/bare-metal-runner.ts` | Spawning agent processes, I/O handling |
-| `src/ipc.ts` | Processing agent IPC requests (messages, tasks) |
-| `src/task-scheduler.ts` | Cron/interval task execution |
-| `src/channels/telegram.ts` | Telegram bot implementation |
+| File                       | Purpose                                           |
+| -------------------------- | ------------------------------------------------- |
+| `src/index.ts`             | Main loop, state management, group processing     |
+| `src/router.ts`            | Message formatting, XML escaping, channel routing |
+| `src/types.ts`             | TypeScript interfaces for all major types         |
+| `src/config.ts`            | Environment configuration (read-only)             |
+| `src/db.ts`                | SQLite operations, schema, migrations             |
+| `src/bare-metal-runner.ts` | Spawning agent processes, I/O handling            |
+| `src/ipc.ts`               | Processing agent IPC requests (messages, tasks)   |
+| `src/task-scheduler.ts`    | Cron/interval task execution                      |
+| `src/channels/telegram.ts` | Telegram bot implementation                       |
 
 ---
 
@@ -185,6 +187,7 @@ npm run release:check
 ```
 
 This runs:
+
 - Type checking
 - Formatting check
 - Full test suite
@@ -269,7 +272,7 @@ describe('runAgent', () => {
 
     expect(onOutput).toHaveBeenCalledTimes(1);
     expect(onOutput).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'success' })
+      expect.objectContaining({ status: 'success' }),
     );
   });
 });
@@ -308,6 +311,7 @@ npm test -- --coverage
 ```
 
 Current coverage goals:
+
 - Core routing/message handling: 90%+
 - IPC authorization: 95%+
 - Edge cases: 80%+
@@ -401,7 +405,8 @@ Use comments for "why", not "what":
 // Good: explains the decision
 // Reset cursor on streaming output so we don't re-process these messages
 // if the orchestrator crashes between advancing lastTimestamp and sending.
-lastAgentTimestamp[chatJid] = messedMessages[missedMessages.length - 1].timestamp;
+lastAgentTimestamp[chatJid] =
+  messedMessages[missedMessages.length - 1].timestamp;
 
 // Avoid: just repeats code
 // Set the timestamp
@@ -427,11 +432,9 @@ Cross-file functions should be documented at the top of the file.
 ### Adding a New Environment Variable
 
 1. Define in `src/config.ts`:
+
    ```typescript
-   export const MY_SETTING = parseInt(
-     process.env.MY_SETTING || '5000',
-     10,
-   );
+   export const MY_SETTING = parseInt(process.env.MY_SETTING || '5000', 10);
    ```
 
 2. Document in `docs/API.md` under Configuration
@@ -444,6 +447,7 @@ Cross-file functions should be documented at the top of the file.
 ### Adding a New Channel
 
 1. Create `src/channels/mychannel.ts` implementing `Channel` interface:
+
    ```typescript
    export class MyChannel implements Channel {
      name = 'mychannel';
@@ -452,6 +456,7 @@ Cross-file functions should be documented at the top of the file.
    ```
 
 2. Instantiate in `src/index.ts`:
+
    ```typescript
    const mychannel = new MyChannel(config);
    channels.push(mychannel);
@@ -465,6 +470,7 @@ Cross-file functions should be documented at the top of the file.
 ### Adding a New IPC Task Type
 
 1. Add case in `src/ipc.ts` `processTaskIpc()`:
+
    ```typescript
    case 'my_task_type':
      // Validate and process
@@ -480,6 +486,7 @@ Cross-file functions should be documented at the top of the file.
 ### Modifying Database Schema
 
 1. Add migration in `src/db.ts` `createSchema()`:
+
    ```typescript
    try {
      database.exec(`ALTER TABLE messages ADD COLUMN new_col TEXT DEFAULT ''`);
@@ -578,6 +585,7 @@ it('stores message correctly', async () => {
 ### Making Changes
 
 1. **Make one logical change per commit**
+
    ```bash
    git add src/my-file.ts
    git commit -m "feat: add new feature"
@@ -594,6 +602,7 @@ it('stores message correctly', async () => {
      - `refactor: extract message validation to separate function`
 
 3. **Ensure tests pass**
+
    ```bash
    npm test
    npm run typecheck
@@ -610,6 +619,7 @@ it('stores message correctly', async () => {
 ### Submitting a Pull Request
 
 1. **Push your branch**
+
    ```bash
    git push origin feature/my-feature
    ```
@@ -620,6 +630,7 @@ it('stores message correctly', async () => {
    - Reference issues: "Fixes #123"
 
 3. **Address review feedback**
+
    ```bash
    # Make changes
    git add .
@@ -638,6 +649,7 @@ Only maintainers can release. See [RELEASE_PROCESS.md](RELEASE_PROCESS.md).
 ### What Gets Reviewed
 
 Code reviews check:
+
 - **Correctness:** Does it work as intended?
 - **Testing:** Are tests present and comprehensive?
 - **Performance:** Will it slow down the system?
@@ -648,20 +660,24 @@ Code reviews check:
 ### Common Review Feedback
 
 **"Add tests"**
+
 - Write unit tests for new functions
 - Write integration tests for multi-component changes
 
 **"Add logging"**
+
 - Include `logger.debug()` for diagnostic info
 - Use `logger.warn()` for suspicious conditions
 - Use `logger.error()` for failures
 
 **"Document this"**
+
 - Add JSDoc comments for exported functions
 - Update API docs if public API changes
 - Add examples in docstrings
 
 **"Extract to separate function"**
+
 - If a function is getting long (>50 lines)
 - If logic is repeated in multiple places
 - If the function does multiple things
@@ -724,8 +740,11 @@ less profile.txt
 ### Database Performance
 
 - Add indexes for frequently queried columns:
+
   ```typescript
-  database.prepare(`CREATE INDEX IF NOT EXISTS idx_chat_jid ON messages(chat_jid)`).run();
+  database
+    .prepare(`CREATE INDEX IF NOT EXISTS idx_chat_jid ON messages(chat_jid)`)
+    .run();
   ```
 
 - Use prepared statements (better-sqlite3 does this automatically)

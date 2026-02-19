@@ -40,6 +40,7 @@ $WORKSPACE_IPC/             # IPC directory
 AgentForge provides tools through the Model Context Protocol (MCP):
 
 ### Core Tools
+
 - `mcp__agentforge__send_message` - Send messages to chat while still processing
 - `mcp__agentforge__schedule_task` - Schedule future or recurring tasks
 - `mcp__agentforge__list_tasks` - List scheduled tasks
@@ -48,6 +49,7 @@ AgentForge provides tools through the Model Context Protocol (MCP):
 - `mcp__agentforge__switch_group` - Switch to a different group context
 
 ### Web Browsing
+
 - `agent-browser` - Interactive web browser for scraping and automation
   - Open pages, click elements, fill forms
   - Take screenshots, extract data
@@ -64,6 +66,7 @@ Skills are loaded from `/workspace/group/.claude/skills/`:
 ## Common Patterns
 
 ### Scheduling a Daily Task
+
 ```typescript
 import fs from 'fs';
 import path from 'path';
@@ -71,24 +74,29 @@ import path from 'path';
 const ipcDir = process.env.WORKSPACE_IPC!;
 const taskFile = path.join(ipcDir, 'input', `task-${Date.now()}.json`);
 
-fs.writeFileSync(taskFile, JSON.stringify({
-  type: 'schedule_task',
-  prompt: 'Send me a morning summary',
-  schedule_type: 'daily',
-  schedule_value: '08:00',
-  schedule_timezone: 'America/New_York'
-}));
+fs.writeFileSync(
+  taskFile,
+  JSON.stringify({
+    type: 'schedule_task',
+    prompt: 'Send me a morning summary',
+    schedule_type: 'daily',
+    schedule_value: '08:00',
+    schedule_timezone: 'America/New_York',
+  }),
+);
 ```
 
 ### Sending an Immediate Message
+
 ```typescript
 // While you're still working, send an acknowledgment
 await mcp__agentforge__send_message({
-  message: 'Got it! Working on that now...'
+  message: 'Got it! Working on that now...',
 });
 ```
 
 ### Reading Daily Memory
+
 ```typescript
 import fs from 'fs';
 import path from 'path';
@@ -103,12 +111,14 @@ if (fs.existsSync(memoryFile)) {
 ```
 
 ### Updating Long-term Memory
+
 ```typescript
 import fs from 'fs';
 
 // Append to memory.md
 const memoryPath = '/workspace/group/memory.md';
-const newFact = '\n\n## User Preference\n\nPrefers concise summaries over detailed reports.\n';
+const newFact =
+  '\n\n## User Preference\n\nPrefers concise summaries over detailed reports.\n';
 
 fs.appendFileSync(memoryPath, newFact);
 ```
@@ -116,6 +126,7 @@ fs.appendFileSync(memoryPath, newFact);
 ## File Path Guidelines
 
 Always use absolute paths or workspace-relative paths:
+
 - ✅ `/workspace/group/myfile.txt`
 - ✅ `./myfile.txt` (relative to CWD)
 - ✅ `path.join(process.env.WORKSPACE_GROUP!, 'myfile.txt')`
