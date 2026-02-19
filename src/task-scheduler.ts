@@ -91,14 +91,28 @@ async function runTask(
       { taskId: task.id, groupFolder: task.group_folder },
       'Group not found for task',
     );
-    logTaskRun({
-      task_id: task.id,
-      run_at: new Date().toISOString(),
-      duration_ms: Date.now() - startTime,
-      status: 'error',
-      result: null,
-      error: `Group not found: ${task.group_folder}`,
-    });
+    const groupNotFoundError = `Group not found: ${task.group_folder}`;
+    try {
+      logTaskRun({
+        task_id: task.id,
+        run_at: new Date().toISOString(),
+        duration_ms: Date.now() - startTime,
+        status: 'error',
+        result: null,
+        error: groupNotFoundError,
+      });
+    } catch (logErr) {
+      logger.warn({ taskId: task.id, err: logErr }, 'Failed to write task run log');
+    }
+    // Still advance the schedule so the task doesn't loop on every poll
+    let nextRun: string | null = null;
+    if (task.schedule_type === 'cron') {
+      const interval = CronExpressionParser.parse(task.schedule_value, { tz: TIMEZONE });
+      nextRun = interval.next().toISOString();
+    } else if (task.schedule_type === 'interval') {
+      nextRun = new Date(Date.now() + parseInt(task.schedule_value, 10)).toISOString();
+    }
+    updateTaskAfterRun(task.id, nextRun, `Error: ${groupNotFoundError}`);
     return;
   }
 
@@ -191,14 +205,23 @@ async function runTask(
 
   const durationMs = Date.now() - startTime;
 
-  logTaskRun({
-    task_id: task.id,
-    run_at: new Date().toISOString(),
-    duration_ms: durationMs,
-    status: error ? 'error' : 'success',
-    result,
-    error,
-  });
+  try {
+    logTaskRun({
+      task_id: task.id,
+      run_at: new Date().toISOString(),
+      duration_ms: durationMs,
+      status: error ? 'error' : 'success',
+      result,
+      error,
+    });
+  } catch (logErr) {
+    // Log write failure (e.g. FK constraint when a task was deleted mid-run)
+    // must not prevent next_run from advancing — otherwise the task loops forever.
+    logger.warn(
+      { taskId: task.id, err: logErr },
+      'Failed to write task run log; schedule will still advance',
+    );
+  }
 
   // Compute next run time for recurring tasks; null signals "completed" to updateTaskAfterRun
   let nextRun: string | null = null;
