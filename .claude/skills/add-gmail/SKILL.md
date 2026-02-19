@@ -1,13 +1,13 @@
 ---
 name: add-gmail
-description: Add Gmail integration to AgentForge. Can be configured as a tool (agent reads/sends emails when triggered from WhatsApp) or as a full channel (emails can trigger the agent, schedule tasks, and receive replies). Guides through GCP OAuth setup and implements the integration.
+description: Add Gmail integration to AgentForge. Can be configured as a tool (agent reads/sends emails when triggered from Telegram) or as a full channel (emails can trigger the agent, schedule tasks, and receive replies). Guides through GCP OAuth setup and implements the integration.
 ---
 
 # Add Gmail Integration
 
 This skill adds Gmail capabilities to AgentForge. It can be configured in two modes:
 
-1. **Tool Mode** - Agent can read/send emails, but only when triggered from WhatsApp
+1. **Tool Mode** - Agent can read/send emails, but only when triggered from Telegram
 2. **Channel Mode** - Emails can trigger the agent, schedule tasks, and receive email replies
 
 ## Initial Questions
@@ -19,14 +19,14 @@ Ask the user:
 > **Option 1: Tool Mode**
 >
 > - Agent can read and send emails when you ask it to
-> - Triggered only from WhatsApp (e.g., "@YourBot check my email" or "@YourBot send an email to...")
+> - Triggered only from Telegram (e.g., "@YourBot check my email" or "@YourBot send an email to...")
 > - Simpler setup, no email polling
 >
 > **Option 2: Channel Mode**
 >
 > - Everything in Tool Mode, plus:
 > - Emails to a specific address/label trigger the agent
-> - Agent replies via email (not WhatsApp)
+> - Agent replies via email (not Telegram)
 > - Can schedule tasks via email
 > - Requires email polling infrastructure
 
@@ -156,6 +156,8 @@ echo '{"method": "tools/list"}' | timeout 10 npx -y @gongrzhe/server-gmail-autoa
 
 If everything works, proceed to implementation.
 
+**Note on credentials access:** AgentForge runs as a baremetal Node.js process under your user account. The agent inherits your `~/.gmail-mcp/` directory directly — no container mounting needed. The MCP server launched by the agent runner will find credentials at `~/.gmail-mcp/credentials.json` automatically.
+
 ---
 
 ## Tool Mode Implementation
@@ -182,39 +184,21 @@ The result should look like:
 
 ```typescript
 mcpServers: {
-  nanoclaw: ipcMcp,
+  agentforge: ipcMcp,
   gmail: { command: 'npx', args: ['-y', '@gongrzhe/server-gmail-autoauth-mcp'] }
 },
 allowedTools: [
   'Bash',
   'Read', 'Write', 'Edit', 'Glob', 'Grep',
   'WebSearch', 'WebFetch',
-  'mcp__nanoclaw__*',
+  'mcp__agentforge__*',
   'mcp__gmail__*'
 ],
 ```
 
-### Step 2: Mount Gmail Credentials in Container
+### Step 2: Update Group Memory
 
-Read `src/container-runner.ts` and find the `buildVolumeMounts` function.
-
-Add this mount block (after the `.claude` mount is a good location):
-
-```typescript
-// Gmail credentials directory
-const gmailDir = path.join(homeDir, '.gmail-mcp');
-if (fs.existsSync(gmailDir)) {
-  mounts.push({
-    hostPath: gmailDir,
-    containerPath: '/home/node/.gmail-mcp',
-    readonly: false, // MCP may need to refresh tokens
-  });
-}
-```
-
-### Step 3: Update Group Memory
-
-Append to `groups/CLAUDE.md` (the global memory file):
+Append to `groups/global/AGENTS.md`:
 
 ```markdown
 ## Email (Gmail)
@@ -230,39 +214,31 @@ You have access to Gmail via MCP tools:
 Example: "Check my unread emails from today" or "Send an email to john@example.com about the meeting"
 ```
 
-Also append the same section to `groups/main/CLAUDE.md`.
+Also append the same section to `groups/main/AGENTS.md`.
 
-### Step 4: Rebuild and Restart
-
-Run these commands:
+### Step 3: Build and Restart
 
 ```bash
-cd container && ./build.sh
-```
-
-Wait for container build to complete, then:
-
-```bash
-cd .. && npm run build
+npm run build
 ```
 
 Wait for TypeScript compilation, then restart the service:
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+sudo systemctl restart agentforge.service
 ```
 
 Check that it started:
 
 ```bash
-sleep 2 && launchctl list | grep nanoclaw
+sleep 2 && sudo systemctl status agentforge.service
 ```
 
-### Step 5: Test Gmail Integration
+### Step 4: Test Gmail Integration
 
 Tell the user:
 
-> Gmail integration is set up! Test it by sending this message in your WhatsApp main channel:
+> Gmail integration is set up! Test it by sending this message in your Telegram main channel:
 >
 > `@YourBot check my recent emails`
 >
@@ -273,7 +249,7 @@ Tell the user:
 Watch the logs for any errors:
 
 ```bash
-tail -f logs/nanoclaw.log
+sudo journalctl -u agentforge.service -f
 ```
 
 ---
@@ -433,9 +409,6 @@ interface EmailMessage {
   date: string;
 }
 
-// Gmail MCP client functions (call via subprocess or import the MCP directly)
-// These would invoke the Gmail MCP tools
-
 export async function checkForNewEmails(): Promise<EmailMessage[]> {
   // Build query based on trigger mode
   let query: string;
@@ -451,12 +424,8 @@ export async function checkForNewEmails(): Promise<EmailMessage[]> {
       break;
   }
 
-  // This requires calling Gmail MCP's search_emails tool
-  // Implementation depends on how you want to invoke MCP from Node
-  // Option 1: Use @anthropic-ai/claude-agent-sdk with just gmail MCP
-  // Option 2: Run npx gmail MCP as subprocess and parse output
-  // Option 3: Import gmail-autoauth-mcp directly
-
+  // Invoke Gmail MCP's search_emails tool via subprocess
+  // Option: run npx gmail MCP as subprocess and parse output
   // Placeholder - implement based on preference
   return [];
 }
@@ -467,14 +436,10 @@ export async function sendEmailReply(
   subject: string,
   body: string,
 ): Promise<void> {
-  // Call Gmail MCP's send_email tool with in_reply_to for threading
-  // Prefix subject with replyPrefix if configured
   const replySubject = subject.startsWith('Re:') ? subject : `Re: ${subject}`;
-
   const prefixedBody = EMAIL_CHANNEL.replyPrefix
     ? `${EMAIL_CHANNEL.replyPrefix}${body}`
     : body;
-
   // Implementation: invoke Gmail MCP send_email
 }
 
@@ -534,10 +499,8 @@ async function startEmailLoop(): Promise<void> {
         );
         markEmailProcessed(email.id, email.threadId, email.from, email.subject);
 
-        // Determine which group/context to use
         const contextKey = getContextKey(email);
 
-        // Build prompt with email content
         const prompt = `<email>
 <from>${email.from}</from>
 <subject>${email.subject}</subject>
@@ -546,8 +509,6 @@ async function startEmailLoop(): Promise<void> {
 
 Respond to this email. Your response will be sent as an email reply.`;
 
-        // Run agent with email context
-        // You'll need to create a registered group for email or use a special handler
         const response = await runEmailAgent(contextKey, prompt, email);
 
         if (response) {
@@ -575,13 +536,12 @@ Respond to this email. Your response will be sent as an email reply.`;
 Then add `startEmailLoop()` in the `main()` function, after `startMessageLoop()`:
 
 ```typescript
-// In main(), after startMessageLoop():
 startEmailLoop();
 ```
 
 ### Step 6: Implement Email Agent Runner
 
-Add this function to `src/index.ts` (or create a separate `src/email-agent.ts` if preferred):
+Read `src/bare-metal-runner.ts` to understand the `runAgent` function signature. Then add a wrapper in `src/index.ts`:
 
 ```typescript
 async function runEmailAgent(
@@ -589,68 +549,22 @@ async function runEmailAgent(
   prompt: string,
   email: EmailMessage,
 ): Promise<string | null> {
-  // Email uses either:
-  // 1. A dedicated "email" group folder
-  // 2. Or dynamic folders per thread/sender
-
   const groupFolder =
     EMAIL_CHANNEL.contextMode === 'single'
-      ? 'main' // Use main group context
-      : `email/${contextKey}`; // Isolated email context
+      ? 'main'
+      : `email/${contextKey}`;
 
-  // Ensure folder exists
   const groupDir = path.join(GROUPS_DIR, groupFolder);
   fs.mkdirSync(groupDir, { recursive: true });
 
-  // Create minimal registered group for email
-  const emailGroup: RegisteredGroup = {
-    name: contextKey,
-    folder: groupFolder,
-    trigger: '', // No trigger for email
-    added_at: new Date().toISOString(),
-  };
-
-  // Use existing runContainerAgent
-  const output = await runContainerAgent(emailGroup, {
-    prompt,
-    sessionId: sessions[groupFolder],
-    groupFolder,
-    chatJid: `email:${email.from}`, // Use email: prefix for JID
-    isMain: false,
-    isScheduledTask: false,
-  });
-
-  if (output.newSessionId) {
-    sessions[groupFolder] = output.newSessionId;
-    setSession(groupFolder, output.newSessionId);
-  }
-
-  return output.status === 'success' ? output.result : null;
+  // Use the baremetal runner — read src/bare-metal-runner.ts for the
+  // exact AgentInput shape and runAgent() signature, then call it here
+  // with chatJid: `email:${email.from}`, isMain: false, isScheduledTask: false
+  return null; // replace with actual call
 }
 ```
 
-### Step 7: Update IPC for Email Responses (Optional)
-
-If you want the agent to be able to send emails proactively from within a session, read `agent-runner-src/src/ipc-mcp.ts` and add this tool:
-
-```typescript
-// Add to the MCP tools
-{
-  name: 'send_email_reply',
-  description: 'Send an email reply in the current thread',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      body: { type: 'string', description: 'Email body content' }
-    },
-    required: ['body']
-  }
-}
-```
-
-Then add handling in `src/ipc.ts` in the `processTaskIpc` function or create a new IPC handler for email actions.
-
-### Step 8: Create Email Group Memory
+### Step 7: Create Email Group Memory
 
 Create the email group directory and memory file:
 
@@ -658,7 +572,7 @@ Create the email group directory and memory file:
 mkdir -p groups/email
 ```
 
-Write `groups/email/CLAUDE.md`:
+Write `groups/email/AGENTS.md`:
 
 ```markdown
 # Email Channel
@@ -677,30 +591,22 @@ You are responding to emails. Your responses will be sent as email replies.
 Each email thread or sender (depending on configuration) has its own conversation history.
 ```
 
-### Step 9: Rebuild and Test
-
-Rebuild the container (required since agent-runner changed):
+### Step 8: Build and Restart
 
 ```bash
-cd container && ./build.sh
-```
-
-Wait for build to complete, then compile TypeScript:
-
-```bash
-cd .. && npm run build
+npm run build
 ```
 
 Restart the service:
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+sudo systemctl restart agentforge.service
 ```
 
 Verify it started and check for email channel startup message:
 
 ```bash
-sleep 3 && tail -20 logs/nanoclaw.log | grep -i email
+sleep 3 && sudo journalctl -u agentforge.service --no-pager | tail -20 | grep -i email
 ```
 
 Tell the user:
@@ -716,7 +622,7 @@ Tell the user:
 Monitor for the test:
 
 ```bash
-tail -f logs/nanoclaw.log | grep -E "(email|Email)"
+sudo journalctl -u agentforge.service -f | grep -E "(email|Email)"
 ```
 
 ---
@@ -742,12 +648,18 @@ npx -y @gongrzhe/server-gmail-autoauth-mcp
 
 - Check the trigger configuration matches your test email
 - Verify the label exists (for label mode)
-- Check `processed_emails` table for already-processed emails
+- Check `processed_emails` table for already-processed emails: `sqlite3 store/messages.db "SELECT * FROM processed_emails LIMIT 10"`
 
-### Container can't access Gmail
+### Agent can't access Gmail
 
-- Verify `~/.gmail-mcp` is mounted in container
-- Check container logs: `cat groups/main/logs/container-*.log | tail -50`
+Since AgentForge runs baremetal as your user, credentials at `~/.gmail-mcp/` are directly accessible. Check:
+
+```bash
+ls -la ~/.gmail-mcp/
+# Should show: gcp-oauth.keys.json, credentials.json
+```
+
+If credentials are missing, re-run the OAuth authorization step.
 
 ---
 
@@ -759,20 +671,16 @@ To remove Gmail entirely:
    - Delete `gmail` from `mcpServers`
    - Remove `mcp__gmail__*` from `allowedTools`
 
-2. Remove from `src/container-runner.ts`:
-   - Delete the `~/.gmail-mcp` mount block
-
-3. Remove from `src/index.ts` (Channel Mode only):
+2. Remove from `src/index.ts` (Channel Mode only):
    - Delete `startEmailLoop()` call
    - Delete email-related imports
 
-4. Delete `src/email-channel.ts` (if created)
+3. Delete `src/email-channel.ts` (if created)
 
-5. Remove Gmail sections from `groups/*/CLAUDE.md`
+4. Remove Gmail sections from `groups/global/AGENTS.md` and `groups/main/AGENTS.md`
 
-6. Rebuild:
+5. Rebuild:
    ```bash
-   cd container && ./build.sh && cd ..
    npm run build
-   launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+   sudo systemctl restart agentforge.service
    ```
