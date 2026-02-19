@@ -61,7 +61,7 @@ User → Telegram → AgentForge (SQLite + message loop) → Claude Agent SDK �
 ### Infrastructure
 
 - **🔄 Systemd service** — Runs persistently as managed system service; auto-restarts on failure
-- **🔐 Secure secrets** — Delivered via stdin, never in environment variables or disk
+- **🔐 Secure secrets** — Delivered via stdin; not in child process env or written to disk
 - **📡 File-based IPC** — Crash-safe bidirectional communication using atomic file writes
 - **🚀 Follow-up messages** — New messages pipe into running sessions without spawning new processes
 - **🎯 Skill-based extensibility** — Add capabilities via `.claude/skills/` without modifying source
@@ -73,12 +73,12 @@ User → Telegram → AgentForge (SQLite + message loop) → Claude Agent SDK �
 
 AgentForge is designed for **dedicated servers** where the operator trusts themselves. It does not sandbox agents.
 
-| Feature                 | AgentForge                  | [NanoClaw](https://github.com/gavrielc/nanoclaw) |
-| ----------------------- | --------------------------- | ------------------------------------------------ |
-| Container isolation     | ❌ Removed by design        | ✅ Yes                                           |
-| Intended environment    | Dedicated / single-operator | General / multi-tenant                           |
-| Agent filesystem access | Full (baremetal)            | Sandboxed                                        |
-| Secrets delivery        | Via stdin (never env vars)  | Container environment                            |
+| Feature                 | AgentForge                                   | [NanoClaw](https://github.com/gavrielc/nanoclaw) |
+| ----------------------- | -------------------------------------------- | ------------------------------------------------ |
+| Container isolation     | ❌ Removed by design                         | ✅ Yes                                           |
+| Intended environment    | Dedicated / single-operator                  | General / multi-tenant                           |
+| Agent filesystem access | Full (baremetal)                             | Sandboxed                                        |
+| Secrets delivery        | Via stdin (not in child process env or disk) | Container environment                            |
 
 **Security guarantees:**
 
