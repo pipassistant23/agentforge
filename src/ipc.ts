@@ -42,6 +42,7 @@ export interface IpcDeps {
     availableGroups: AvailableGroup[],
     registeredJids: Set<string>,
   ) => void;
+  refreshTasksSnapshot: (groupFolder: string) => void;
 }
 
 /** Prevents startIpcWatcher from being called more than once. */
@@ -328,6 +329,7 @@ export async function processTaskIpc(
           status: 'active',
           created_at: new Date().toISOString(),
         });
+        deps.refreshTasksSnapshot(sourceGroup);
         logger.info(
           { taskId, sourceGroup, targetFolder, contextMode },
           'Task created via IPC',
@@ -340,6 +342,7 @@ export async function processTaskIpc(
         const task = getTaskById(data.taskId);
         if (task && (isMain || task.group_folder === sourceGroup)) {
           updateTask(data.taskId, { status: 'paused' });
+          deps.refreshTasksSnapshot(sourceGroup);
           logger.info(
             { taskId: data.taskId, sourceGroup },
             'Task paused via IPC',
@@ -358,6 +361,7 @@ export async function processTaskIpc(
         const task = getTaskById(data.taskId);
         if (task && (isMain || task.group_folder === sourceGroup)) {
           updateTask(data.taskId, { status: 'active' });
+          deps.refreshTasksSnapshot(sourceGroup);
           logger.info(
             { taskId: data.taskId, sourceGroup },
             'Task resumed via IPC',
@@ -376,6 +380,7 @@ export async function processTaskIpc(
         const task = getTaskById(data.taskId);
         if (task && (isMain || task.group_folder === sourceGroup)) {
           deleteTask(data.taskId);
+          deps.refreshTasksSnapshot(sourceGroup);
           logger.info(
             { taskId: data.taskId, sourceGroup },
             'Task cancelled via IPC',

@@ -615,6 +615,23 @@ async function main(): Promise<void> {
     getAvailableGroups,
     writeGroupsSnapshot: (gf, im, ag, rj) =>
       writeGroupsSnapshot(gf, im, ag, rj),
+    refreshTasksSnapshot: (groupFolder) => {
+      const isMain = groupFolder === MAIN_GROUP_FOLDER;
+      const tasks = getAllTasks();
+      writeTasksSnapshot(
+        groupFolder,
+        isMain,
+        tasks.map((t) => ({
+          id: t.id,
+          groupFolder: t.group_folder,
+          prompt: t.prompt,
+          schedule_type: t.schedule_type,
+          schedule_value: t.schedule_value,
+          status: t.status,
+          next_run: t.next_run,
+        })),
+      );
+    },
   });
   queue.setProcessMessagesFn(processGroupMessages);
   recoverPendingMessages();
