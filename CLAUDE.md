@@ -48,6 +48,10 @@ Single Node.js process that connects to Telegram, routes messages to Claude Agen
 - ✅ File-based IPC for bidirectional communication
 - ✅ Per-group isolation with dedicated workspaces
 
+## Repository Rules
+
+- **Never create summary, changelog, migration, contributing, or other documentation files** in the repo root or anywhere else unless explicitly requested. The only permitted root-level markdown files are `README.md` and `CLAUDE.md`.
+
 ## Git Practices
 
 This is a public repository. `main` is always stable and reflects what the running service is on.
