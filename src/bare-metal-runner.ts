@@ -132,6 +132,12 @@ function setupGroupSession(group: RegisteredGroup): string {
       for (const file of fs.readdirSync(srcDir)) {
         const srcFile = path.join(srcDir, file);
         const dstFile = path.join(dstDir, file);
+        if (
+          fs.existsSync(dstFile) &&
+          fs.statSync(dstFile).mtimeMs >= fs.statSync(srcFile).mtimeMs
+        ) {
+          continue;
+        }
         fs.copyFileSync(srcFile, dstFile);
       }
     }
@@ -152,9 +158,14 @@ function setupGroupSession(group: RegisteredGroup): string {
   for (const templateFile of sharedTemplateFiles) {
     const srcFile = path.join(globalWorkspace, templateFile);
     const dstFile = path.join(groupWorkspace, templateFile);
-    if (fs.existsSync(srcFile)) {
-      fs.copyFileSync(srcFile, dstFile);
+    if (!fs.existsSync(srcFile)) continue;
+    if (
+      fs.existsSync(dstFile) &&
+      fs.statSync(dstFile).mtimeMs >= fs.statSync(srcFile).mtimeMs
+    ) {
+      continue;
     }
+    fs.copyFileSync(srcFile, dstFile);
   }
 
   // Ensure group-specific template files exist
@@ -259,7 +270,10 @@ export async function runContainerAgent(
     // Spawn agent as baremetal Node.js process
     const agentProcess = spawn(
       'node',
-      [path.join(process.cwd(), 'agent-runner-src/dist/index.js')],
+      [
+        '--max-old-space-size=512',
+        path.join(process.cwd(), 'agent-runner-src/dist/index.js'),
+      ],
       {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: path.join(GROUPS_DIR, group.folder),
