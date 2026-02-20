@@ -403,7 +403,14 @@ async function runAgent(
 }
 
 /**
- * Main polling loop that drives message delivery to agents.
+ * Safety-net polling loop for message delivery to agents.
+ *
+ * Real-time dispatch is handled by the push path: each channel's onMessage
+ * callback calls queue.enqueueMessageCheck() immediately when a message
+ * arrives, so agents fire without waiting for a poll tick.
+ *
+ * This loop runs at a slower cadence (30 s by default) to catch any messages
+ * that the push path may have missed (e.g. a crash between store and enqueue).
  *
  * On each tick:
  * 1. Fetches new messages across all registered groups
@@ -544,7 +551,12 @@ async function main(): Promise<void> {
 
   // Channel callbacks (shared by all channels)
   const channelOpts = {
-    onMessage: (chatJid: string, msg: NewMessage) => storeMessage(msg),
+    onMessage: (chatJid: string, msg: NewMessage) => {
+      storeMessage(msg);
+      // Push-trigger: immediately enqueue a message check so the agent
+      // dispatches without waiting for the next polling loop tick.
+      queue.enqueueMessageCheck(chatJid);
+    },
     onChatMetadata: (chatJid: string, timestamp: string, name?: string) =>
       storeChatMetadata(chatJid, timestamp, name),
     registeredGroups: () => registeredGroups,
