@@ -16,6 +16,27 @@ warn()    { echo -e "${YELLOW}⚠${NC}  $*"; }
 error()   { echo -e "${RED}✗${NC} $*" >&2; }
 header()  { echo -e "\n${BOLD}$*${NC}"; }
 
+# read_secret <var> <prompt>
+# Like `read -s` but prints * for each character so the user can see input length.
+read_secret() {
+  local _var="$1" _prompt="$2" _input="" _char=""
+  printf "%b" "$_prompt"
+  while IFS= read -u 3 -r -s -n1 _char; do
+    [[ -z "$_char" ]] && break                        # Enter
+    if [[ "$_char" == $'\177' || "$_char" == $'\010' ]]; then
+      if [[ -n "$_input" ]]; then
+        _input="${_input%?}"
+        printf '\b \b'
+      fi
+    else
+      _input+="$_char"
+      printf '*'
+    fi
+  done
+  echo ""
+  printf -v "$_var" '%s' "$_input"
+}
+
 # ── Banner ────────────────────────────────────────────────────────────────────
 cat << 'BANNER'
 
@@ -128,7 +149,7 @@ else
 
   # Telegram bot token
   while true; do
-    read -u 3 -r -s -p "$(echo -e "${BOLD}Telegram bot token${NC} (from @BotFather): ")" TG_TOKEN
+    read_secret TG_TOKEN "$(echo -e "${BOLD}Telegram bot token${NC} (from @BotFather): ")"
     echo ""
     [[ -n "$TG_TOKEN" ]] && break
     warn "Telegram bot token is required."
@@ -152,7 +173,7 @@ else
 
   if [[ "$AUTH_CHOICE" == "2" ]]; then
     while true; do
-      read -u 3 -r -s -p "$(echo -e "${BOLD}Claude Code OAuth token${NC}: ")" OAUTH_TOKEN
+      read_secret OAUTH_TOKEN "$(echo -e "${BOLD}Claude Code OAuth token${NC}: ")"
       echo ""
       [[ -n "$OAUTH_TOKEN" ]] && break
       warn "Token is required."
@@ -164,7 +185,7 @@ else
       warn "Base URL is required."
     done
     while true; do
-      read -u 3 -r -s -p "$(echo -e "${BOLD}API key / token${NC}: ")" CUSTOM_TOKEN
+      read_secret CUSTOM_TOKEN "$(echo -e "${BOLD}API key / token${NC}: ")"
       echo ""
       [[ -n "$CUSTOM_TOKEN" ]] && break
       warn "API key is required."
@@ -173,7 +194,7 @@ else
     CUSTOM_MODEL="${CUSTOM_MODEL:-claude-sonnet-4-5-20250929}"
   else
     while true; do
-      read -u 3 -r -s -p "$(echo -e "${BOLD}Anthropic API key${NC} (sk-ant-...): ")" ANTHROPIC_KEY
+      read_secret ANTHROPIC_KEY "$(echo -e "${BOLD}Anthropic API key${NC} (sk-ant-...): ")"
       echo ""
       [[ -n "$ANTHROPIC_KEY" ]] && break
       warn "API key is required."
