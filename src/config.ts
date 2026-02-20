@@ -82,3 +82,6 @@ export const GMAIL_POLL_INTERVAL = parseInt(
   process.env.GMAIL_POLL_INTERVAL || '60000',
   10,
 );
+export const GMAIL_ALLOWED_SENDERS: string[] = process.env.GMAIL_ALLOWED_SENDERS
+  ? process.env.GMAIL_ALLOWED_SENDERS.split(',').map(s => s.trim().toLowerCase())
+  : []; // empty = allow all (backward compat)

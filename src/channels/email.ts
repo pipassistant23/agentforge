@@ -12,6 +12,7 @@ import nodemailer from 'nodemailer';
 import { ImapFlow } from 'imapflow';
 
 import { logger } from '../logger.js';
+import { GMAIL_ALLOWED_SENDERS } from '../config.js';
 import {
   Channel,
   OnInboundMessage,
@@ -175,6 +176,18 @@ export class EmailChannel implements Channel {
         const senderName = from.name || senderEmail;
 
         if (!senderEmail) continue;
+
+        // Allowlist check — skip senders not in GMAIL_ALLOWED_SENDERS (when set)
+        if (
+          GMAIL_ALLOWED_SENDERS.length > 0 &&
+          !GMAIL_ALLOWED_SENDERS.includes(senderEmail.toLowerCase())
+        ) {
+          logger.warn(
+            { senderEmail },
+            'Email sender not in GMAIL_ALLOWED_SENDERS allowlist — skipping',
+          );
+          continue;
+        }
 
         // Parse plain text body from source
         const source = msg.source?.toString() || '';
