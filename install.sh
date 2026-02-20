@@ -123,17 +123,21 @@ else
     warn "Telegram bot token is required."
   done
 
-  # API key — offer two options
+  # API key — offer three options
   echo ""
   echo -e "${BOLD}Claude API authentication — choose one:${NC}"
-  echo "  1) Anthropic API key  (pay-per-use, get from console.anthropic.com)"
-  echo "  2) Claude Code OAuth  (if you have a Claude subscription)"
+  echo "  1) Anthropic API key     (pay-per-use, get from console.anthropic.com)"
+  echo "  2) Claude Code OAuth     (if you have a Claude Max/Pro subscription)"
+  echo "  3) Third-party provider  (OpenRouter, Together, local Ollama, etc.)"
   echo ""
   read -u 3 -r -p "Choice [1]: " AUTH_CHOICE
   AUTH_CHOICE="${AUTH_CHOICE:-1}"
 
   ANTHROPIC_KEY=""
   OAUTH_TOKEN=""
+  CUSTOM_TOKEN=""
+  CUSTOM_BASE_URL=""
+  CUSTOM_MODEL=""
 
   if [[ "$AUTH_CHOICE" == "2" ]]; then
     while true; do
@@ -141,6 +145,19 @@ else
       [[ -n "$OAUTH_TOKEN" ]] && break
       warn "Token is required."
     done
+  elif [[ "$AUTH_CHOICE" == "3" ]]; then
+    while true; do
+      read -u 3 -r -p "$(echo -e "${BOLD}API base URL${NC} (e.g. https://openrouter.ai/api/v1): ")" CUSTOM_BASE_URL
+      [[ -n "$CUSTOM_BASE_URL" ]] && break
+      warn "Base URL is required."
+    done
+    while true; do
+      read -u 3 -r -p "$(echo -e "${BOLD}API key / token${NC}: ")" CUSTOM_TOKEN
+      [[ -n "$CUSTOM_TOKEN" ]] && break
+      warn "API key is required."
+    done
+    read -u 3 -r -p "$(echo -e "${BOLD}Model name${NC} (e.g. anthropic/claude-sonnet-4-5, default: claude-sonnet-4-5-20250929): ")" CUSTOM_MODEL
+    CUSTOM_MODEL="${CUSTOM_MODEL:-claude-sonnet-4-5-20250929}"
   else
     while true; do
       read -u 3 -r -p "$(echo -e "${BOLD}Anthropic API key${NC} (sk-ant-...): ")" ANTHROPIC_KEY
@@ -163,6 +180,11 @@ else
     fi
     if [[ -n "$OAUTH_TOKEN" ]]; then
       echo "CLAUDE_CODE_OAUTH_TOKEN=$OAUTH_TOKEN"
+    fi
+    if [[ -n "$CUSTOM_TOKEN" ]]; then
+      echo "ANTHROPIC_AUTH_TOKEN=$CUSTOM_TOKEN"
+      echo "ANTHROPIC_BASE_URL=$CUSTOM_BASE_URL"
+      echo "ANTHROPIC_MODEL=$CUSTOM_MODEL"
     fi
     echo "ASSISTANT_NAME=$ASSISTANT_NAME"
     echo ""
