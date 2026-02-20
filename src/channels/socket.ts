@@ -9,12 +9,17 @@
  * Client → Server:
  *   { "type": "message", "text": "hello" }\n
  *   { "type": "ping" }\n
+ *   { "type": "status" }\n
  *
  * Server → Client:
- *   { "type": "response", "text": "hi there" }\n
+ *   { "type": "history", "messages": [...] }\n
+ *   { "type": "chunk", "text": "..." }\n       ← streaming partial response
+ *   { "type": "response_end" }\n               ← end of streaming response
+ *   { "type": "response", "text": "..." }\n    ← non-streaming message
  *   { "type": "typing", "active": true }\n
  *   { "type": "pong" }\n
  *   { "type": "error", "message": "..." }\n
+ *   { "type": "status", "connections": N, "uptime": N }\n
  *
  * JID format: socket:{uuid}
  * Each connection auto-registers with the main group folder.
@@ -24,6 +29,7 @@ import fs from 'fs';
 import net from 'net';
 
 import { SOCKET_PATH } from '../config.js';
+import { getRecentSocketHistory } from '../db.js';
 import { logger } from '../logger.js';
 import {
   Channel,
@@ -54,6 +60,7 @@ export class SocketChannel implements Channel {
   private opts: SocketChannelOpts;
   private server: net.Server | null = null;
   private connections = new Map<string, SocketConnection>(); // jid → connection
+  private typingJids = new Set<string>();
   private listening = false;
 
   constructor(opts: SocketChannelOpts) {
@@ -118,6 +125,19 @@ export class SocketChannel implements Channel {
 
     this.opts.onChatMetadata(jid, timestamp);
 
+    // Send recent history so the client can show conversation context
+    const history = getRecentSocketHistory(30);
+    if (history.length > 0) {
+      this.writeToSocket(socket, {
+        type: 'history',
+        messages: history.map((m) => ({
+          role: m.is_from_me ? 'assistant' : 'user',
+          content: m.content,
+          timestamp: m.timestamp,
+        })),
+      });
+    }
+
     socket.on('data', (chunk: Buffer) => {
       conn.buffer += chunk.toString('utf8');
       this.processBuffer(conn);
@@ -125,11 +145,13 @@ export class SocketChannel implements Channel {
 
     socket.on('end', () => {
       logger.info({ jid }, 'Socket client disconnected');
+      this.typingJids.delete(jid);
       this.connections.delete(jid);
     });
 
     socket.on('error', (err) => {
       logger.debug({ jid, err }, 'Socket client error');
+      this.typingJids.delete(jid);
       this.connections.delete(jid);
     });
   }
@@ -197,6 +219,15 @@ export class SocketChannel implements Channel {
       return;
     }
 
+    if (type === 'status') {
+      this.writeToSocket(conn.socket, {
+        type: 'status',
+        connections: this.connections.size,
+        uptime: Math.floor(process.uptime()),
+      });
+      return;
+    }
+
     this.writeToSocket(conn.socket, {
       type: 'error',
       message: `Unknown message type: ${type}`,
@@ -221,14 +252,24 @@ export class SocketChannel implements Channel {
       logger.warn({ jid }, 'No socket connection found for JID');
       return;
     }
-    this.writeToSocket(conn.socket, { type: 'response', text });
-    logger.info({ jid, length: text.length }, 'Socket response sent');
+    // During active typing, send as streaming chunk; otherwise discrete response
+    const msgType = this.typingJids.has(jid) ? 'chunk' : 'response';
+    this.writeToSocket(conn.socket, { type: msgType, text });
+    logger.info({ jid, length: text.length }, `Socket ${msgType} sent`);
   }
 
   async setTyping(jid: string, active: boolean): Promise<void> {
     const conn = this.connections.get(jid);
     if (!conn) return;
-    this.writeToSocket(conn.socket, { type: 'typing', active });
+    if (active) {
+      this.typingJids.add(jid);
+      this.writeToSocket(conn.socket, { type: 'typing', active: true });
+    } else {
+      this.typingJids.delete(jid);
+      // Signal end of streaming response before clearing typing indicator
+      this.writeToSocket(conn.socket, { type: 'response_end' });
+      this.writeToSocket(conn.socket, { type: 'typing', active: false });
+    }
   }
 
   isConnected(): boolean {
@@ -249,6 +290,7 @@ export class SocketChannel implements Channel {
       }
     }
     this.connections.clear();
+    this.typingJids.clear();
 
     // Close the server
     if (this.server) {
