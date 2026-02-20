@@ -53,6 +53,7 @@ function createSchema(database: Database.Database): void {
       FOREIGN KEY (chat_jid) REFERENCES chats(jid)
     );
     CREATE INDEX IF NOT EXISTS idx_timestamp ON messages(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_messages_jid_ts ON messages(chat_jid, timestamp);
 
     CREATE TABLE IF NOT EXISTS scheduled_tasks (
       id TEXT PRIMARY KEY,
@@ -106,8 +107,13 @@ function createSchema(database: Database.Database): void {
     database.exec(
       `ALTER TABLE scheduled_tasks ADD COLUMN context_mode TEXT DEFAULT 'isolated'`,
     );
-  } catch {
-    /* column already exists */
+  } catch (err) {
+    if (
+      !(err instanceof Error) ||
+      !err.message.includes('duplicate column name')
+    ) {
+      throw err;
+    }
   }
 
   // Add is_bot_message column if it doesn't exist (migration for existing DBs)
@@ -119,8 +125,13 @@ function createSchema(database: Database.Database): void {
     database
       .prepare(`UPDATE messages SET is_bot_message = 1 WHERE content LIKE ?`)
       .run(`${ASSISTANT_NAME}:%`);
-  } catch {
-    /* column already exists */
+  } catch (err) {
+    if (
+      !(err instanceof Error) ||
+      !err.message.includes('duplicate column name')
+    ) {
+      throw err;
+    }
   }
 }
 
@@ -134,6 +145,8 @@ export function initDatabase(): void {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
   db = new Database(dbPath);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
   createSchema(db);
 
   // Migrate from JSON files if they exist
