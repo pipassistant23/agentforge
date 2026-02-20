@@ -28,10 +28,12 @@ interface GroupState {
 export class GroupQueue {
   private groups = new Map<string, GroupState>();
   private activeCount = 0;
-  private waitingGroups: string[] = [];
+  private waitingGroupsSet = new Set<string>();
+  private waitingGroupsQueue: string[] = [];
   private processMessagesFn: ((groupJid: string) => Promise<boolean>) | null =
     null;
   private shuttingDown = false;
+  private activePromises = new Set<Promise<void>>();
 
   private getGroup(groupJid: string): GroupState {
     let state = this.groups.get(groupJid);
@@ -48,6 +50,19 @@ export class GroupQueue {
       this.groups.set(groupJid, state);
     }
     return state;
+  }
+
+  private enqueueWaiting(jid: string): void {
+    if (!this.waitingGroupsSet.has(jid)) {
+      this.waitingGroupsSet.add(jid);
+      this.waitingGroupsQueue.push(jid);
+    }
+  }
+
+  private dequeueWaiting(): string | undefined {
+    const jid = this.waitingGroupsQueue.shift();
+    if (jid) this.waitingGroupsSet.delete(jid);
+    return jid;
   }
 
   setProcessMessagesFn(fn: (groupJid: string) => Promise<boolean>): void {
@@ -67,9 +82,7 @@ export class GroupQueue {
 
     if (this.activeCount >= MAX_CONCURRENT_PROCESSES) {
       state.pendingMessages = true;
-      if (!this.waitingGroups.includes(groupJid)) {
-        this.waitingGroups.push(groupJid);
-      }
+      this.enqueueWaiting(groupJid);
       logger.debug(
         { groupJid, activeCount: this.activeCount },
         'At concurrency limit, message queued',
@@ -99,9 +112,7 @@ export class GroupQueue {
 
     if (this.activeCount >= MAX_CONCURRENT_PROCESSES) {
       state.pendingTasks.push({ id: taskId, groupJid, fn });
-      if (!this.waitingGroups.includes(groupJid)) {
-        this.waitingGroups.push(groupJid);
-      }
+      this.enqueueWaiting(groupJid);
       logger.debug(
         { groupJid, taskId, activeCount: this.activeCount },
         'At concurrency limit, task queued',
@@ -163,7 +174,16 @@ export class GroupQueue {
     }
   }
 
-  private async runForGroup(
+  private runForGroup(
+    groupJid: string,
+    reason: 'messages' | 'drain',
+  ): void {
+    const promise = this._runForGroup(groupJid, reason);
+    this.activePromises.add(promise);
+    promise.finally(() => this.activePromises.delete(promise));
+  }
+
+  private async _runForGroup(
     groupJid: string,
     reason: 'messages' | 'drain',
   ): Promise<void> {
@@ -199,7 +219,13 @@ export class GroupQueue {
     }
   }
 
-  private async runTask(groupJid: string, task: QueuedTask): Promise<void> {
+  private runTask(groupJid: string, task: QueuedTask): void {
+    const promise = this._runTask(groupJid, task);
+    this.activePromises.add(promise);
+    promise.finally(() => this.activePromises.delete(promise));
+  }
+
+  private async _runTask(groupJid: string, task: QueuedTask): Promise<void> {
     const state = this.getGroup(groupJid);
     state.active = true;
     this.activeCount++;
@@ -270,10 +296,10 @@ export class GroupQueue {
 
   private drainWaiting(): void {
     while (
-      this.waitingGroups.length > 0 &&
+      this.waitingGroupsQueue.length > 0 &&
       this.activeCount < MAX_CONCURRENT_PROCESSES
     ) {
-      const nextJid = this.waitingGroups.shift()!;
+      const nextJid = this.dequeueWaiting()!;
       const state = this.getGroup(nextJid);
 
       // Prioritize tasks over messages
@@ -287,14 +313,14 @@ export class GroupQueue {
     }
   }
 
-  async shutdown(_gracePeriodMs: number): Promise<void> {
+  async shutdown(gracePeriodMs: number): Promise<void> {
     this.shuttingDown = true;
 
     // Count active processes but don't kill them — they'll finish on their own
     // via idle timeout or process timeout.
     // This prevents reconnection restarts from killing working agents.
     const activeProcesses: string[] = [];
-    for (const [jid, state] of this.groups) {
+    for (const [, state] of this.groups) {
       if (state.process && !state.process.killed && state.processName) {
         activeProcesses.push(state.processName);
       }
@@ -302,7 +328,17 @@ export class GroupQueue {
 
     logger.info(
       { activeCount: this.activeCount, detachedProcesses: activeProcesses },
-      'GroupQueue shutting down (processes detached, not killed)',
+      'GroupQueue shutting down — waiting for in-flight promises',
     );
+
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+    await Promise.race([
+      Promise.all([...this.activePromises]),
+      sleep(gracePeriodMs),
+    ]);
+
+    logger.info('GroupQueue shutdown complete');
   }
 }
