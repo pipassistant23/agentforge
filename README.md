@@ -112,6 +112,12 @@ curl -fsSL https://raw.githubusercontent.com/pipassistant23/agentforge/main/inst
 
 Clones the repo, builds everything, prompts for your bot token and API key, writes `.env`, and optionally installs the systemd service — all in one step.
 
+To uninstall:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pipassistant23/agentforge/main/uninstall.sh | bash
+```
+
 ### Option B — Manual install
 
 #### 1. Clone and run setup

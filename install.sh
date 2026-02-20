@@ -248,3 +248,6 @@ echo "  sudo systemctl restart agentforge.service   # Restart after .env changes
 echo "  sudo journalctl -u agentforge.service -f    # Follow logs"
 echo "  $INSTALL_DIR/install-service.sh             # (Re)install systemd service"
 echo ""
+echo "To uninstall:"
+echo "  curl -fsSL https://raw.githubusercontent.com/pipassistant23/agentforge/main/uninstall.sh | bash"
+echo ""
