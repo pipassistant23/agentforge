@@ -11,7 +11,7 @@ export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
 
 // Poll intervals (milliseconds)
-export const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || '2000', 10); // Main message poll interval
+export const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || '30000', 10); // Safety-net poll interval — push dispatch handles real-time delivery
 export const SCHEDULER_POLL_INTERVAL = parseInt(
   process.env.SCHEDULER_POLL_INTERVAL || '60000',
   10,

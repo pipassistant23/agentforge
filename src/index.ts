@@ -35,15 +35,18 @@ import {
 } from './bare-metal-runner.js';
 import {
   getAllChats,
+  getAllCursors,
   getAllPendingCursors,
   getAllRegisteredGroups,
   getAllSessions,
   getAllTasks,
+  getCursor,
   getMessagesSince,
   getNewMessages,
   getRouterState,
   initDatabase,
   clearPendingCursor,
+  setCursor,
   setRegisteredGroup,
   setRouterState,
   setSession,
@@ -78,8 +81,9 @@ let registeredGroups: Record<string, RegisteredGroup> = {};
 
 /**
  * Per-group cursor tracking the last message that was handed off to an agent.
- * Separate from lastTimestamp so the agent can catch up missed messages
- * independently from the "seen" cursor that prevents double-processing.
+ * In-memory cache of the agent_cursors SQLite table. The DB is the source of
+ * truth; this map is warmed from getAllCursors() on startup and kept in sync
+ * via setCursor() on every write.
  */
 let lastAgentTimestamp: Record<string, string> = {};
 
@@ -98,13 +102,9 @@ const queue = new GroupQueue();
  */
 function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
-  const agentTs = getRouterState('last_agent_timestamp');
-  try {
-    lastAgentTimestamp = agentTs ? JSON.parse(agentTs) : {};
-  } catch {
-    logger.warn('Corrupted last_agent_timestamp in DB, resetting');
-    lastAgentTimestamp = {};
-  }
+  // Load per-group agent cursors from the dedicated agent_cursors table.
+  // Each row is an independent UPSERT so a write failure only affects one group.
+  lastAgentTimestamp = getAllCursors();
   sessions = getAllSessions();
   registeredGroups = getAllRegisteredGroups();
   logger.info(
@@ -117,9 +117,25 @@ function loadState(): void {
  * Persist the message-seen and agent-processed cursors to the DB.
  * Called after advancing either cursor so crashes don't replay messages.
  */
+/**
+ * Persist the message-seen cursor to the DB.
+ * Agent cursors are now written atomically per-group via setCursor(); this
+ * function only needs to persist the global lastTimestamp.
+ */
 function saveState(): void {
   setRouterState('last_timestamp', lastTimestamp);
-  setRouterState('last_agent_timestamp', JSON.stringify(lastAgentTimestamp));
+}
+
+/**
+ * Advance the agent cursor for a single group and persist it atomically.
+ * Updates both the in-memory cache and the agent_cursors DB row.
+ *
+ * @param chatJid - The chat JID whose cursor should advance
+ * @param timestamp - The new cursor timestamp
+ */
+function advanceCursor(chatJid: string, timestamp: string): void {
+  lastAgentTimestamp[chatJid] = timestamp;
+  setCursor(chatJid, timestamp);
 }
 
 /**
@@ -416,7 +432,14 @@ async function runAgent(
 }
 
 /**
- * Main polling loop that drives message delivery to agents.
+ * Safety-net polling loop for message delivery to agents.
+ *
+ * Real-time dispatch is handled by the push path: each channel's onMessage
+ * callback calls queue.enqueueMessageCheck() immediately when a message
+ * arrives, so agents fire without waiting for a poll tick.
+ *
+ * This loop runs at a slower cadence (30 s by default) to catch any messages
+ * that the push path may have missed (e.g. a crash between store and enqueue).
  *
  * On each tick:
  * 1. Fetches new messages across all registered groups
@@ -587,7 +610,12 @@ async function main(): Promise<void> {
 
   // Channel callbacks (shared by all channels)
   const channelOpts = {
-    onMessage: (chatJid: string, msg: NewMessage) => storeMessage(msg),
+    onMessage: (chatJid: string, msg: NewMessage) => {
+      storeMessage(msg);
+      // Push-trigger: immediately enqueue a message check so the agent
+      // dispatches without waiting for the next polling loop tick.
+      queue.enqueueMessageCheck(chatJid);
+    },
     onChatMetadata: (chatJid: string, timestamp: string, name?: string) =>
       storeChatMetadata(chatJid, timestamp, name),
     registeredGroups: () => registeredGroups,
