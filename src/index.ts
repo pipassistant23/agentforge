@@ -24,9 +24,12 @@ import {
   TELEGRAM_BOT_POOL,
   TELEGRAM_BOT_TOKEN,
   TRIGGER_PATTERN,
+  SOCKET_ENABLED,
+  SOCKET_PATH,
 } from './config.js';
 import { TelegramChannel, initBotPool } from './channels/telegram.js';
 import { EmailChannel } from './channels/email.js';
+import { SocketChannel } from './channels/socket.js';
 import {
   AgentOutput,
   runContainerAgent,
@@ -647,6 +650,26 @@ async function main(): Promise<void> {
       logger.error(
         { err },
         'Failed to connect email channel — continuing without it',
+      );
+    }
+  }
+
+  // Initialize socket channel for local client connections (TUI, web, etc.)
+  if (SOCKET_ENABLED) {
+    try {
+      const socket = new SocketChannel({
+        ...channelOpts,
+        registerGroup,
+        groupFolder: MAIN_GROUP_FOLDER,
+        assistantName: ASSISTANT_NAME,
+      });
+      channels.push(socket);
+      await socket.connect();
+      logger.info({ path: SOCKET_PATH }, 'Socket channel listening');
+    } catch (err) {
+      logger.error(
+        { err },
+        'Failed to connect socket channel — continuing without it',
       );
     }
   }
