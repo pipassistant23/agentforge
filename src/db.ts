@@ -8,6 +8,7 @@
  * - Router state (polling cursors)
  * - Claude session IDs (per-group conversation continuity)
  * - Registered group definitions
+ * - Per-group agent cursors (atomic, row-per-group)
  *
  * Uses better-sqlite3 for synchronous access — all reads and writes
  * are blocking and happen on the main thread alongside the event loop.
@@ -89,6 +90,11 @@ function createSchema(database: Database.Database): void {
     CREATE TABLE IF NOT EXISTS sessions (
       group_folder TEXT PRIMARY KEY,
       session_id TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS agent_cursors (
+      chat_jid TEXT PRIMARY KEY,
+      last_timestamp TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS registered_groups (
       jid TEXT PRIMARY KEY,
@@ -479,7 +485,7 @@ export function logTaskRun(log: TaskRunLog): void {
 
 /**
  * Read a key from the persistent router_state table.
- * Used to restore polling cursors (last_timestamp, last_agent_timestamp) on startup.
+ * Used to restore the polling cursor (last_timestamp) on startup.
  *
  * @param key - The state key to read
  * @returns The stored value string, or undefined if the key doesn't exist
@@ -533,6 +539,67 @@ export function getAllSessions(): Record<string, string> {
     result[row.group_folder] = row.session_id;
   }
   return result;
+}
+
+
+// --- Agent cursor accessors ---
+
+/**
+ * Read the last-processed agent timestamp for a single chat.
+ *
+ * @param chatJid - The chat JID to look up
+ * @returns The stored timestamp string, or null if no cursor exists yet
+ */
+export function getCursor(chatJid: string): string | null {
+  const row = db
+    .prepare('SELECT last_timestamp FROM agent_cursors WHERE chat_jid = ?')
+    .get(chatJid) as { last_timestamp: string } | undefined;
+  return row?.last_timestamp ?? null;
+}
+
+/**
+ * Persist the last-processed agent timestamp for a single chat.
+ * Each call is an atomic single-row UPSERT — a write failure only affects
+ * one group's cursor, not the entire map.
+ *
+ * @param chatJid - The chat JID to update
+ * @param timestamp - The ISO timestamp to store as the new cursor
+ */
+export function setCursor(chatJid: string, timestamp: string): void {
+  db.prepare(
+    `INSERT INTO agent_cursors (chat_jid, last_timestamp, updated_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(chat_jid) DO UPDATE SET
+       last_timestamp = excluded.last_timestamp,
+       updated_at = excluded.updated_at`,
+  ).run(chatJid, timestamp);
+}
+
+/**
+ * Load all agent cursors as a JID-keyed map.
+ * Called once on startup to warm the in-memory cache.
+ *
+ * @returns Map of chatJid -> last_timestamp
+ */
+export function getAllCursors(): Record<string, string> {
+  const rows = db
+    .prepare('SELECT chat_jid, last_timestamp FROM agent_cursors')
+    .all() as Array<{ chat_jid: string; last_timestamp: string }>;
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    result[row.chat_jid] = row.last_timestamp;
+  }
+  return result;
+}
+
+/**
+ * Remove the cursor row for a chat JID.
+ * Useful when a group is de-registered and its cursor is no longer needed.
+ *
+ * @param chatJid - The chat JID whose cursor should be removed
+ */
+export function deleteCursor(chatJid: string): void {
+  db.prepare('DELETE FROM agent_cursors WHERE chat_jid = ?').run(chatJid);
 }
 
 // --- Registered group accessors ---
@@ -634,6 +701,9 @@ export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
  * data directory, imports their contents into the appropriate DB tables, then
  * renames each file to `*.migrated` so the migration doesn't repeat on the
  * next startup. Files that don't exist or can't be parsed are silently skipped.
+ *
+ * Also migrates the legacy `last_agent_timestamp` JSON blob (from router_state
+ * table or router_state.json) into the per-row `agent_cursors` table.
  */
 function migrateJsonState(): void {
   const migrateFile = (filename: string) => {
@@ -658,11 +728,35 @@ function migrateJsonState(): void {
       setRouterState('last_timestamp', routerState.last_timestamp);
     }
     if (routerState.last_agent_timestamp) {
-      setRouterState(
-        'last_agent_timestamp',
-        JSON.stringify(routerState.last_agent_timestamp),
-      );
+      // Migrate per-group cursors into the new agent_cursors table
+      for (const [jid, ts] of Object.entries(
+        routerState.last_agent_timestamp,
+      )) {
+        setCursor(jid, ts);
+      }
     }
+  }
+
+  // Migrate the legacy last_agent_timestamp blob from the router_state DB key
+  // (populated by a previous router_state.json migration or old code path).
+  const legacyBlob = getRouterState('last_agent_timestamp');
+  if (legacyBlob) {
+    try {
+      const map = JSON.parse(legacyBlob) as Record<string, string>;
+      for (const [jid, ts] of Object.entries(map)) {
+        // Only write if there is no newer cursor already in agent_cursors
+        const existing = getCursor(jid);
+        if (!existing || ts > existing) {
+          setCursor(jid, ts);
+        }
+      }
+    } catch {
+      // Corrupted blob — ignore, cursors will reset to empty
+    }
+    // Remove the stale blob so we don't re-read it on future startups
+    db.prepare(
+      `DELETE FROM router_state WHERE key = 'last_agent_timestamp'`,
+    ).run();
   }
 
   // Migrate sessions.json
