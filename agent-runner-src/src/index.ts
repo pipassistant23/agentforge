@@ -473,18 +473,26 @@ function drainIpcInput(): string[] {
  * here for the next user message before starting a new query in the same session.
  * The host closes stdin (and later writes _close) to terminate this wait.
  *
+ * IMPORTANT: message files are always drained before checking the `_close`
+ * sentinel. The filesystem's readdir order is not guaranteed to match creation
+ * order, so `_close` may appear before pending message files. Draining first
+ * ensures no messages are lost when the host writes both simultaneously.
+ *
  * @returns The next message text, or null if `_close` was received
  */
 function waitForIpcMessage(): Promise<string | null> {
   return new Promise((resolve) => {
     const poll = () => {
-      if (shouldClose()) {
-        resolve(null);
-        return;
-      }
+      // Always drain pending messages before checking _close.
+      // If _close arrived alongside message files, the messages must be
+      // delivered first; the sentinel is processed only after the queue is empty.
       const messages = drainIpcInput();
       if (messages.length > 0) {
         resolve(messages.join('\n'));
+        return;
+      }
+      if (shouldClose()) {
+        resolve(null);
         return;
       }
       setTimeout(poll, IPC_POLL_MS);
@@ -532,21 +540,23 @@ async function runQuery(
 
   // Poll IPC for follow-up messages and _close sentinel during the query.
   // Messages get piped into the stream so the agent can respond without a new process.
+  // IMPORTANT: drain messages before checking _close so that any message files
+  // written alongside the sentinel are not lost due to non-deterministic readdir order.
   let ipcPolling = true;
   let closedDuringQuery = false;
   const pollIpcDuringQuery = () => {
     if (!ipcPolling) return;
+    const messages = drainIpcInput();
+    for (const text of messages) {
+      log(`Piping IPC message into active query (${text.length} chars)`);
+      stream.push(text);
+    }
     if (shouldClose()) {
       log('Close sentinel detected during query, ending stream');
       closedDuringQuery = true;
       stream.end();
       ipcPolling = false;
       return;
-    }
-    const messages = drainIpcInput();
-    for (const text of messages) {
-      log(`Piping IPC message into active query (${text.length} chars)`);
-      stream.push(text);
     }
     setTimeout(pollIpcDuringQuery, IPC_POLL_MS);
   };

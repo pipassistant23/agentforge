@@ -16,7 +16,14 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 
-import { ASSISTANT_NAME, DATA_DIR, STORE_DIR } from './config.js';
+import {
+  ASSISTANT_NAME,
+  DATA_DIR,
+  MESSAGE_RETENTION_DAYS,
+  STORE_DIR,
+  TASK_LOG_RETENTION_DAYS,
+} from './config.js';
+import { logger } from './logger.js';
 import {
   NewMessage,
   RegisteredGroup,
@@ -100,6 +107,10 @@ function createSchema(database: Database.Database): void {
       agent_config TEXT,
       requires_trigger INTEGER DEFAULT 1
     );
+    CREATE TABLE IF NOT EXISTS pending_cursors (
+      chat_jid TEXT PRIMARY KEY,
+      cursor TEXT NOT NULL
+    );
   `);
 
   // Add context_mode column if it doesn't exist (migration for existing DBs)
@@ -136,6 +147,41 @@ function createSchema(database: Database.Database): void {
 }
 
 /**
+ * Delete old rows from `messages` and `task_run_logs` to bound table growth.
+ *
+ * Retention windows are controlled by env vars:
+ * - `MESSAGE_RETENTION_DAYS`  (default 90) — rows older than this are deleted
+ * - `TASK_LOG_RETENTION_DAYS` (default 30) — run log rows older than this are deleted
+ *
+ * Called automatically at the end of `initDatabase()`.
+ */
+export function runRetentionSweep(): void {
+  const msgResult = db
+    .prepare(
+      `DELETE FROM messages WHERE timestamp < datetime('now', '-${MESSAGE_RETENTION_DAYS} days')`,
+    )
+    .run();
+  if (msgResult.changes > 0) {
+    logger.info(
+      { deleted: msgResult.changes, retentionDays: MESSAGE_RETENTION_DAYS },
+      'Retention sweep: deleted old messages',
+    );
+  }
+
+  const logResult = db
+    .prepare(
+      `DELETE FROM task_run_logs WHERE run_at < datetime('now', '-${TASK_LOG_RETENTION_DAYS} days')`,
+    )
+    .run();
+  if (logResult.changes > 0) {
+    logger.info(
+      { deleted: logResult.changes, retentionDays: TASK_LOG_RETENTION_DAYS },
+      'Retention sweep: deleted old task run logs',
+    );
+  }
+}
+
+/**
  * Initialize the SQLite database at the configured path.
  * Creates the store directory if needed, then runs schema creation and
  * migrates any legacy JSON state files to the database.
@@ -151,6 +197,9 @@ export function initDatabase(): void {
 
   // Migrate from JSON files if they exist
   migrateJsonState();
+
+  // Purge rows that exceed the configured retention windows
+  runRetentionSweep();
 }
 
 /** @internal - for tests only. Creates a fresh in-memory database. */
@@ -634,6 +683,51 @@ export function getAllRegisteredGroups(): Record<string, RegisteredGroup> {
       requiresTrigger:
         row.requires_trigger === null ? undefined : row.requires_trigger === 1,
     };
+  }
+  return result;
+}
+
+// --- Pending cursor accessors (two-phase commit for agent dispatch) ---
+
+/**
+ * Write a pending cursor for a chat JID.
+ * Called before dispatching an agent so a crash during processing can be
+ * detected on the next startup via recoverPendingMessages().
+ *
+ * @param chatJid - The chat JID being processed
+ * @param cursor - The timestamp the agent is about to process up to
+ */
+export function setPendingCursor(chatJid: string, cursor: string): void {
+  db.prepare(
+    'INSERT OR REPLACE INTO pending_cursors (chat_jid, cursor) VALUES (?, ?)',
+  ).run(chatJid, cursor);
+}
+
+/**
+ * Remove the pending cursor for a chat JID after the agent has confirmed
+ * successful delivery. This completes the two-phase commit.
+ *
+ * @param chatJid - The chat JID whose pending cursor should be cleared
+ */
+export function clearPendingCursor(chatJid: string): void {
+  db.prepare('DELETE FROM pending_cursors WHERE chat_jid = ?').run(chatJid);
+}
+
+/**
+ * Load all pending cursors as a JID-keyed map.
+ * Called on startup to detect crash-in-flight scenarios: any chat JID whose
+ * pending cursor is ahead of its last_agent_timestamp was being processed
+ * when the previous run crashed and needs to be requeued.
+ *
+ * @returns Map of chatJid -> pending cursor timestamp
+ */
+export function getAllPendingCursors(): Record<string, string> {
+  const rows = db
+    .prepare('SELECT chat_jid, cursor FROM pending_cursors')
+    .all() as Array<{ chat_jid: string; cursor: string }>;
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    result[row.chat_jid] = row.cursor;
   }
   return result;
 }
