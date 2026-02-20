@@ -25,12 +25,13 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=agentforge
 
-# Security hardening (optional - uncomment if desired)
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+# Optional stricter hardening (uncomment if desired):
 # ProtectSystem=strict
 # ProtectHome=read-only
 # ReadWritePaths={{WORKING_DIR}}/store {{WORKING_DIR}}/data {{WORKING_DIR}}/logs /data
-# NoNewPrivileges=true
-# PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
