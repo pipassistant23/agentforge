@@ -38,8 +38,15 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
+// ── Spinner ───────────────────────────────────────────────────────────────────
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
 // ── State ────────────────────────────────────────────────────────────────────
 let isThinking = false;
+let spinnerInterval = null;
+let spinnerFrame = 0;
+let workStartTime = null;
+let sessionStartTime = null;
 let rl = null;
 let socket = null;
 let lineBuffer = '';
@@ -67,6 +74,10 @@ function showPrompt() {
 }
 
 function clearThinkingLine() {
+  if (spinnerInterval) {
+    clearInterval(spinnerInterval);
+    spinnerInterval = null;
+  }
   if (isThinking) {
     process.stdout.write(C.clearLine);
     isThinking = false;
@@ -74,8 +85,18 @@ function clearThinkingLine() {
 }
 
 function showThinking() {
-  process.stdout.write(`${C.clearLine}${C.dim}${C.italic}  thinking…${C.reset}`);
+  if (spinnerInterval) return; // already running
+  workStartTime = Date.now();
+  spinnerFrame = 0;
   isThinking = true;
+  spinnerInterval = setInterval(() => {
+    const elapsed = ((Date.now() - workStartTime) / 1000).toFixed(1);
+    const frame = SPINNER_FRAMES[spinnerFrame % SPINNER_FRAMES.length];
+    spinnerFrame++;
+    process.stdout.write(
+      `${C.clearLine}${C.cyan}${frame}${C.reset}${C.dim} thinking… ${elapsed}s${C.reset}`,
+    );
+  }, 80);
 }
 
 // ── Print formatted messages ─────────────────────────────────────────────────
@@ -252,16 +273,26 @@ function handleServerMessage(raw) {
       streamBuffer += msg.text || '';
       break;
 
-    case 'response_end':
+    case 'response_end': {
       if (streamStarted) {
-        // End the streaming response with spacing
         sendDesktopNotification(streamBuffer);
-        process.stdout.write('\n\n');
+        process.stdout.write('\n');
+        // Stats line — show duration, token counts, model if provided
+        const statParts = [];
+        if (msg.durationMs !== undefined) statParts.push(`${(msg.durationMs / 1000).toFixed(1)}s`);
+        if (msg.tokensIn !== undefined) statParts.push(`${msg.tokensIn} in`);
+        if (msg.tokensOut !== undefined) statParts.push(`${msg.tokensOut} out`);
+        if (msg.model) statParts.push(msg.model);
+        if (statParts.length > 0) {
+          process.stdout.write(`${C.dim}  ${statParts.join(' · ')}${C.reset}\n`);
+        }
+        process.stdout.write('\n');
         streamBuffer = '';
         streamStarted = false;
       }
       showPrompt();
       break;
+    }
 
     case 'typing':
       if (msg.active) {
@@ -285,10 +316,12 @@ function handleServerMessage(raw) {
 
     case 'status': {
       const uptime = msg.uptime !== undefined ? formatUptime(Number(msg.uptime)) : 'unknown';
+      const session = sessionStartTime ? formatUptime(Math.floor((Date.now() - sessionStartTime) / 1000)) : 'unknown';
       process.stdout.write(
         `\n${C.cyan}${C.bold}Service Status${C.reset}\n` +
-        `  Uptime:      ${uptime}\n` +
-        `  Connections: ${msg.connections}\n\n`
+        `  Service uptime:  ${uptime}\n` +
+        `  Session time:    ${session}\n` +
+        `  Connections:     ${msg.connections}\n\n`,
       );
       showPrompt();
       break;
@@ -417,7 +450,8 @@ function connect() {
       process.stdout.write(`\n${C.dim}Reconnected.${C.reset}\n\n`);
       showPrompt();
     } else {
-      // First connection — set up readline
+      // First connection — start session timer and set up readline
+      sessionStartTime = Date.now();
       setupReadline();
     }
   });
