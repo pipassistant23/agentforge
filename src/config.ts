@@ -93,5 +93,7 @@ export const GMAIL_POLL_INTERVAL = parseInt(
   10,
 );
 export const GMAIL_ALLOWED_SENDERS: string[] = process.env.GMAIL_ALLOWED_SENDERS
-  ? process.env.GMAIL_ALLOWED_SENDERS.split(',').map(s => s.trim().toLowerCase())
+  ? process.env.GMAIL_ALLOWED_SENDERS.split(',').map((s) =>
+      s.trim().toLowerCase(),
+    )
   : []; // empty = allow all (backward compat)

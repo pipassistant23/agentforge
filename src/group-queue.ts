@@ -174,10 +174,7 @@ export class GroupQueue {
     }
   }
 
-  private runForGroup(
-    groupJid: string,
-    reason: 'messages' | 'drain',
-  ): void {
+  private runForGroup(groupJid: string, reason: 'messages' | 'drain'): void {
     const promise = this._runForGroup(groupJid, reason);
     this.activePromises.add(promise);
     promise.finally(() => this.activePromises.delete(promise));

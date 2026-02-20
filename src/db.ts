@@ -639,7 +639,6 @@ export function getAllSessions(): Record<string, string> {
   return result;
 }
 
-
 // --- Agent cursor accessors ---
 
 /**

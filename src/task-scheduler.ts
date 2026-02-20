@@ -262,15 +262,19 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
         // Mark in-progress before enqueuing so the next getDueTasks() poll
         // (which may fire while this task is still running) won't pick it up again.
         setTaskInProgress(currentTask.id);
-        deps.queue.enqueueTask(currentTask.chat_jid, currentTask.id, async () => {
-          try {
-            await runTask(currentTask, deps);
-          } finally {
-            // Reset status after run so updateTaskAfterRun can set the correct
-            // final status (active for recurring, completed for once-tasks).
-            resetTaskFromInProgress(currentTask.id);
-          }
-        });
+        deps.queue.enqueueTask(
+          currentTask.chat_jid,
+          currentTask.id,
+          async () => {
+            try {
+              await runTask(currentTask, deps);
+            } finally {
+              // Reset status after run so updateTaskAfterRun can set the correct
+              // final status (active for recurring, completed for once-tasks).
+              resetTaskFromInProgress(currentTask.id);
+            }
+          },
+        );
       }
     } catch (err) {
       logger.error({ err }, 'Error in scheduler loop');

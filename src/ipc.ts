@@ -292,31 +292,54 @@ export async function processTaskIpc(
     case 'schedule_task': {
       const targetGroupEntry = registeredGroups[data.targetJid];
       if (!targetGroupEntry) {
-        logger.warn({ targetJid: data.targetJid }, 'Cannot schedule task: target group not registered');
+        logger.warn(
+          { targetJid: data.targetJid },
+          'Cannot schedule task: target group not registered',
+        );
         break;
       }
       const targetFolder = targetGroupEntry.folder;
       if (!isMain && targetFolder !== sourceGroup) {
-        logger.warn({ sourceGroup, targetFolder }, 'Unauthorized schedule_task attempt blocked');
+        logger.warn(
+          { sourceGroup, targetFolder },
+          'Unauthorized schedule_task attempt blocked',
+        );
         break;
       }
       const scheduleType = data.schedule_type;
       let nextRun: string | null = null;
       if (scheduleType === 'cron') {
         try {
-          const interval = CronExpressionParser.parse(data.schedule_value, { tz: TIMEZONE });
+          const interval = CronExpressionParser.parse(data.schedule_value, {
+            tz: TIMEZONE,
+          });
           nextRun = interval.next().toISOString();
         } catch {
-          logger.warn({ scheduleValue: data.schedule_value }, 'Invalid cron expression');
+          logger.warn(
+            { scheduleValue: data.schedule_value },
+            'Invalid cron expression',
+          );
           break;
         }
       } else if (scheduleType === 'interval') {
         const ms = parseInt(data.schedule_value, 10);
-        if (isNaN(ms) || ms <= 0) { logger.warn({ scheduleValue: data.schedule_value }, 'Invalid interval'); break; }
+        if (isNaN(ms) || ms <= 0) {
+          logger.warn(
+            { scheduleValue: data.schedule_value },
+            'Invalid interval',
+          );
+          break;
+        }
         nextRun = new Date(Date.now() + ms).toISOString();
       } else if (scheduleType === 'once') {
         const scheduled = new Date(data.schedule_value);
-        if (isNaN(scheduled.getTime())) { logger.warn({ scheduleValue: data.schedule_value }, 'Invalid timestamp'); break; }
+        if (isNaN(scheduled.getTime())) {
+          logger.warn(
+            { scheduleValue: data.schedule_value },
+            'Invalid timestamp',
+          );
+          break;
+        }
         nextRun = scheduled.toISOString();
       }
       const taskId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -334,7 +357,10 @@ export async function processTaskIpc(
         created_at: new Date().toISOString(),
       });
       deps.refreshTasksSnapshot(sourceGroup);
-      logger.info({ taskId, sourceGroup, targetFolder, contextMode }, 'Task created via IPC');
+      logger.info(
+        { taskId, sourceGroup, targetFolder, contextMode },
+        'Task created via IPC',
+      );
       break;
     }
 
@@ -343,9 +369,15 @@ export async function processTaskIpc(
       if (task && (isMain || task.group_folder === sourceGroup)) {
         updateTask(data.taskId, { status: 'paused' });
         deps.refreshTasksSnapshot(sourceGroup);
-        logger.info({ taskId: data.taskId, sourceGroup }, 'Task paused via IPC');
+        logger.info(
+          { taskId: data.taskId, sourceGroup },
+          'Task paused via IPC',
+        );
       } else {
-        logger.warn({ taskId: data.taskId, sourceGroup }, 'Unauthorized task pause attempt');
+        logger.warn(
+          { taskId: data.taskId, sourceGroup },
+          'Unauthorized task pause attempt',
+        );
       }
       break;
     }
@@ -355,9 +387,15 @@ export async function processTaskIpc(
       if (task && (isMain || task.group_folder === sourceGroup)) {
         updateTask(data.taskId, { status: 'active' });
         deps.refreshTasksSnapshot(sourceGroup);
-        logger.info({ taskId: data.taskId, sourceGroup }, 'Task resumed via IPC');
+        logger.info(
+          { taskId: data.taskId, sourceGroup },
+          'Task resumed via IPC',
+        );
       } else {
-        logger.warn({ taskId: data.taskId, sourceGroup }, 'Unauthorized task resume attempt');
+        logger.warn(
+          { taskId: data.taskId, sourceGroup },
+          'Unauthorized task resume attempt',
+        );
       }
       break;
     }
@@ -367,33 +405,56 @@ export async function processTaskIpc(
       if (task && (isMain || task.group_folder === sourceGroup)) {
         deleteTask(data.taskId);
         deps.refreshTasksSnapshot(sourceGroup);
-        logger.info({ taskId: data.taskId, sourceGroup }, 'Task cancelled via IPC');
+        logger.info(
+          { taskId: data.taskId, sourceGroup },
+          'Task cancelled via IPC',
+        );
       } else {
-        logger.warn({ taskId: data.taskId, sourceGroup }, 'Unauthorized task cancel attempt');
+        logger.warn(
+          { taskId: data.taskId, sourceGroup },
+          'Unauthorized task cancel attempt',
+        );
       }
       break;
     }
 
     case 'refresh_groups': {
       if (isMain) {
-        logger.info({ sourceGroup }, 'Group metadata refresh requested via IPC');
+        logger.info(
+          { sourceGroup },
+          'Group metadata refresh requested via IPC',
+        );
         await deps.syncGroupMetadata(true);
         const availableGroups = deps.getAvailableGroups();
-        deps.writeGroupsSnapshot(sourceGroup, true, availableGroups, new Set(Object.keys(registeredGroups)));
+        deps.writeGroupsSnapshot(
+          sourceGroup,
+          true,
+          availableGroups,
+          new Set(Object.keys(registeredGroups)),
+        );
       } else {
-        logger.warn({ sourceGroup }, 'Unauthorized refresh_groups attempt blocked');
+        logger.warn(
+          { sourceGroup },
+          'Unauthorized refresh_groups attempt blocked',
+        );
       }
       break;
     }
 
     case 'register_group': {
       if (!isMain) {
-        logger.warn({ sourceGroup }, 'Unauthorized register_group attempt blocked');
+        logger.warn(
+          { sourceGroup },
+          'Unauthorized register_group attempt blocked',
+        );
         break;
       }
       const folderRegex = /^[a-z0-9][a-z0-9_-]*$/;
       if (!folderRegex.test(data.folder)) {
-        logger.error({ folder: data.folder, sourceGroup }, 'Invalid folder name - must be alphanumeric with hyphens/underscores only');
+        logger.error(
+          { folder: data.folder, sourceGroup },
+          'Invalid folder name - must be alphanumeric with hyphens/underscores only',
+        );
         break;
       }
       const jidRegex = /^(tg:-?\d+|[\w.+-]+@[\w.+-]+)$/;
@@ -402,7 +463,10 @@ export async function processTaskIpc(
         break;
       }
       if (data.name.length > 100) {
-        logger.error({ nameLength: data.name.length, sourceGroup }, 'Invalid name - exceeds 100 characters');
+        logger.error(
+          { nameLength: data.name.length, sourceGroup },
+          'Invalid name - exceeds 100 characters',
+        );
         break;
       }
       deps.registerGroup(data.jid, {
@@ -419,7 +483,10 @@ export async function processTaskIpc(
     default: {
       // Unreachable when IpcTaskPayload is exhaustive — TypeScript will flag missing cases.
       const _exhaustive: never = data;
-      logger.warn({ type: (_exhaustive as { type: string }).type }, 'Unknown IPC task type');
+      logger.warn(
+        { type: (_exhaustive as { type: string }).type },
+        'Unknown IPC task type',
+      );
     }
   }
 }
