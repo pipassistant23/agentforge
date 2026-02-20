@@ -5,7 +5,9 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build:runner && tsc",
+    "build:runner": "cd agent-runner-src && npm run build",
+    "build:orchestrator": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",

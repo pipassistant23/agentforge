@@ -33,6 +33,7 @@ export class GroupQueue {
   private processMessagesFn: ((groupJid: string) => Promise<boolean>) | null =
     null;
   private shuttingDown = false;
+  private activePromises = new Set<Promise<void>>();
 
   private getGroup(groupJid: string): GroupState {
     let state = this.groups.get(groupJid);
@@ -173,7 +174,16 @@ export class GroupQueue {
     }
   }
 
-  private async runForGroup(
+  private runForGroup(
+    groupJid: string,
+    reason: 'messages' | 'drain',
+  ): void {
+    const promise = this._runForGroup(groupJid, reason);
+    this.activePromises.add(promise);
+    promise.finally(() => this.activePromises.delete(promise));
+  }
+
+  private async _runForGroup(
     groupJid: string,
     reason: 'messages' | 'drain',
   ): Promise<void> {
@@ -209,7 +219,13 @@ export class GroupQueue {
     }
   }
 
-  private async runTask(groupJid: string, task: QueuedTask): Promise<void> {
+  private runTask(groupJid: string, task: QueuedTask): void {
+    const promise = this._runTask(groupJid, task);
+    this.activePromises.add(promise);
+    promise.finally(() => this.activePromises.delete(promise));
+  }
+
+  private async _runTask(groupJid: string, task: QueuedTask): Promise<void> {
     const state = this.getGroup(groupJid);
     state.active = true;
     this.activeCount++;
@@ -297,14 +313,14 @@ export class GroupQueue {
     }
   }
 
-  async shutdown(_gracePeriodMs: number): Promise<void> {
+  async shutdown(gracePeriodMs: number): Promise<void> {
     this.shuttingDown = true;
 
     // Count active processes but don't kill them — they'll finish on their own
     // via idle timeout or process timeout.
     // This prevents reconnection restarts from killing working agents.
     const activeProcesses: string[] = [];
-    for (const [jid, state] of this.groups) {
+    for (const [, state] of this.groups) {
       if (state.process && !state.process.killed && state.processName) {
         activeProcesses.push(state.processName);
       }
@@ -312,7 +328,17 @@ export class GroupQueue {
 
     logger.info(
       { activeCount: this.activeCount, detachedProcesses: activeProcesses },
-      'GroupQueue shutting down (processes detached, not killed)',
+      'GroupQueue shutting down — waiting for in-flight promises',
     );
+
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+    await Promise.race([
+      Promise.all([...this.activePromises]),
+      sleep(gracePeriodMs),
+    ]);
+
+    logger.info('GroupQueue shutdown complete');
   }
 }
