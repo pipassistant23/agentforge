@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "release:check": "npm run typecheck && npm run format:check && npm test",
-    "version": "node -e \"const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));console.log(p.version);\""
+    "version": "node -e \"const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));console.log(p.version);\"",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@types/nodemailer": "^7.0.10",

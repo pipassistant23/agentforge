@@ -33,7 +33,8 @@ describe('JID ownership patterns', () => {
 // --- getAvailableGroups ---
 
 describe('getAvailableGroups', () => {
-  it('returns only @g.us JIDs', () => {
+  it('returns all registered chats regardless of JID format', () => {
+    // @g.us whitelist removed: all non-sentinel JIDs are returned
     storeChatMetadata('group1@g.us', '2024-01-01T00:00:01.000Z', 'Group 1');
     storeChatMetadata(
       'user@s.whatsapp.net',
@@ -41,10 +42,32 @@ describe('getAvailableGroups', () => {
       'User DM',
     );
     storeChatMetadata('group2@g.us', '2024-01-01T00:00:03.000Z', 'Group 2');
+    storeChatMetadata(
+      'email:alice@example.com',
+      '2024-01-01T00:00:04.000Z',
+      'Email Group',
+    );
+
+    const groups = getAvailableGroups();
+    // All 4 non-sentinel chats are returned
+    expect(groups).toHaveLength(4);
+    expect(groups.map((g) => g.jid)).toContain('group1@g.us');
+    expect(groups.map((g) => g.jid)).toContain('user@s.whatsapp.net');
+    expect(groups.map((g) => g.jid)).toContain('group2@g.us');
+    expect(groups.map((g) => g.jid)).toContain('email:alice@example.com');
+  });
+
+  it('includes Telegram JIDs (tg: prefix)', () => {
+    storeChatMetadata(
+      'tg:-1001234567890',
+      '2024-01-01T00:00:01.000Z',
+      'TG Group',
+    );
+    storeChatMetadata('group@g.us', '2024-01-01T00:00:02.000Z', 'WA Group');
 
     const groups = getAvailableGroups();
     expect(groups).toHaveLength(2);
-    expect(groups.every((g) => g.jid.endsWith('@g.us'))).toBe(true);
+    expect(groups.map((g) => g.jid)).toContain('tg:-1001234567890');
   });
 
   it('excludes __group_sync__ sentinel', () => {

@@ -153,11 +153,7 @@ export function getAvailableGroups(): import('./bare-metal-runner.js').Available
   const registeredJids = new Set(Object.keys(registeredGroups));
 
   return chats
-    .filter(
-      (c) =>
-        c.jid !== '__group_sync__' &&
-        (c.jid.endsWith('@g.us') || c.jid.startsWith('tg:')),
-    )
+    .filter((c) => c.jid !== '__group_sync__')
     .map((c) => ({
       jid: c.jid,
       name: c.name,
