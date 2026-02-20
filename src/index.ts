@@ -269,6 +269,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   await channel.setTyping?.(chatJid, true);
   let hadError = false;
   let outputSentToUser = false;
+  let totalTokensIn = 0;
+  let totalTokensOut = 0;
+  let responseModel = '';
+  const agentStartTime = Date.now();
 
   const output = await runAgent(
     group,
@@ -296,13 +300,23 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         resetIdleTimer();
       }
 
+      // Accumulate token usage across all streaming chunks
+      if (result.tokensIn) totalTokensIn += result.tokensIn;
+      if (result.tokensOut) totalTokensOut += result.tokensOut;
+      if (result.model) responseModel = result.model;
+
       if (result.status === 'error') {
         hadError = true;
       }
     },
   );
 
-  await channel.setTyping?.(chatJid, false);
+  await channel.setTyping?.(chatJid, false, {
+    tokensIn: totalTokensIn || undefined,
+    tokensOut: totalTokensOut || undefined,
+    model: responseModel || undefined,
+    durationMs: Date.now() - agentStartTime,
+  });
   if (idleTimer) clearTimeout(idleTimer);
 
   if (output === 'error' || hadError) {

@@ -258,7 +258,16 @@ export class SocketChannel implements Channel {
     logger.info({ jid, length: text.length }, `Socket ${msgType} sent`);
   }
 
-  async setTyping(jid: string, active: boolean): Promise<void> {
+  async setTyping(
+    jid: string,
+    active: boolean,
+    stats?: {
+      tokensIn?: number;
+      tokensOut?: number;
+      model?: string;
+      durationMs?: number;
+    },
+  ): Promise<void> {
     const conn = this.connections.get(jid);
     if (!conn) return;
     if (active) {
@@ -266,8 +275,16 @@ export class SocketChannel implements Channel {
       this.writeToSocket(conn.socket, { type: 'typing', active: true });
     } else {
       this.typingJids.delete(jid);
-      // Signal end of streaming response before clearing typing indicator
-      this.writeToSocket(conn.socket, { type: 'response_end' });
+      // Signal end of streaming response, including token stats if available
+      this.writeToSocket(conn.socket, {
+        type: 'response_end',
+        ...(stats?.tokensIn !== undefined && { tokensIn: stats.tokensIn }),
+        ...(stats?.tokensOut !== undefined && { tokensOut: stats.tokensOut }),
+        ...(stats?.model && { model: stats.model }),
+        ...(stats?.durationMs !== undefined && {
+          durationMs: stats.durationMs,
+        }),
+      });
       this.writeToSocket(conn.socket, { type: 'typing', active: false });
     }
   }
