@@ -586,10 +586,26 @@ async function runQuery(
     groupAgentsMd = substituteVariables(rawContent);
   }
 
-  // Combine global and group AGENTS.md into systemPrompt
-  const combinedAgentsMd = [globalAgentsMd, groupAgentsMd]
-    .filter(Boolean)
-    .join('\n\n---\n\n');
+  // Auto-inject BOOTSTRAP.md into system prompt when present.
+  // This ensures the agent follows bootstrap instructions without needing to
+  // proactively read the file — a Read tool call on the first message is unreliable.
+  const bootstrapMdPath = path.join(WORKSPACE_GROUP, 'BOOTSTRAP.md');
+  let bootstrapMd: string | undefined;
+  if (fs.existsSync(bootstrapMdPath)) {
+    const rawContent = fs.readFileSync(bootstrapMdPath, 'utf-8');
+    bootstrapMd = substituteVariables(rawContent);
+    log('BOOTSTRAP.md detected — injecting into system prompt');
+  }
+
+  // Combine global, group AGENTS.md, and optional BOOTSTRAP.md into systemPrompt.
+  // Bootstrap goes last so it takes highest contextual priority.
+  const systemPromptParts = [globalAgentsMd, groupAgentsMd];
+  if (bootstrapMd) {
+    systemPromptParts.push(
+      `## Active Bootstrap\n\nBOOTSTRAP.md is present and setup is not yet complete. You MUST follow the bootstrap flow described below before responding normally. Once setup is done, delete this file.\n\n${bootstrapMd}`,
+    );
+  }
+  const combinedAgentsMd = systemPromptParts.filter(Boolean).join('\n\n---\n\n');
 
   // Discover additional directories mounted at extra workspace.
   // These are passed to the SDK for additional context (e.g., shared resources).
