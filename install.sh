@@ -19,17 +19,30 @@ header()  { echo -e "\n${BOLD}$*${NC}"; }
 # ── Banner ────────────────────────────────────────────────────────────────────
 cat << 'BANNER'
 
- /$$$                                   /$      /$$$$
-| $__  $                               | $     | $_____/
-| $  \ $  /$$$   /$$$ /$$$  /$$$    | $      /$$$   /$$$   /$$$   /$$$
-| $$$$/| $__  $/$__  $| $__  $|_  $_/   | $$$  /$__  $/$__  $/$__  $/$__  $
-| $__  $| $  \ $| $$$$| $  \ $  | $     | $__/ | $  \ $| $  \__/| $  \ $| $$$$
-| $  | $| $  | $| $_____/| $  | $  | $ /$ | $    | $  | $| $      | $  | $| $_____/
-| $  | $|  $$$$|  $$$$| $  | $  |  $$/ | $    |  $$$/  | $      |  $$$$|  $$$$
-|__/  |__/ \____  $\_______/|__/  |__/  \___/  |__/   \______/ |__/      \____  $\_______/
-            /$  \ $                                                          /$  \ $
-           |  $$$/                                                          |  $$$/
-            \______/                                                         \______/
+  ______                                  __      ________                                       
+ /      \                                |  \    |        \                                      
+|  $$$$$$\  ______    ______   _______  _| $$_   | $$$$$$$$______    ______    ______    ______  
+| $$__| $$ /      \  /      \ |       \|   $$ \  | $$__   /      \  /      \  /      \  /      \ 
+| $$    $$|  $$$$$$\|  $$$$$$\| $$$$$$$\\$$$$$$  | $$  \ |  $$$$$$\|  $$$$$$\|  $$$$$$\|  $$$$$$\
+| $$$$$$$$| $$  | $$| $$    $$| $$  | $$ | $$ __ | $$$$$ | $$  | $$| $$   \$$| $$  | $$| $$    $$
+| $$  | $$| $$__| $$| $$$$$$$$| $$  | $$ | $$|  \| $$    | $$__/ $$| $$      | $$__| $$| $$$$$$$$
+| $$  | $$ \$$    $$ \$$     \| $$  | $$  \$$  $$| $$     \$$    $$| $$       \$$    $$ \$$     \
+ \$$   \$$ _\$$$$$$$  \$$$$$$$ \$$   \$$   \$$$$  \$$      \$$$$$$  \$$       _\$$$$$$$  \$$$$$$$
+          |  \__| $$                                                         |  \__| $$          
+           \$$    $$                                                          \$$    $$          
+            \$$$$$$                                                            \$$$$$$           
+                                                                                                 
+                                                                                                 
+                                                                                                 
+                                                                                                 
+                                                                                                 
+                                                                                                 
+                                                                                                 
+                                                                                                 
+                                                                                                 
+                                                                                                 
+                                                                                                 
+                                                                                                 
 
 BANNER
 
@@ -226,7 +239,27 @@ if command -v systemctl &>/dev/null; then
   read -u 3 -r -p "$(echo -e "Install as a systemd service? [Y/n] ")" INSTALL_SVC
   if [[ ! "$INSTALL_SVC" =~ ^[Nn]$ ]]; then
     cd "$INSTALL_DIR"
-    bash install-service.sh <&3
+
+    NODE_PATH=$(which node)
+    NODE_BIN_DIR=$(dirname "$NODE_PATH")
+    SERVICE_FILE="/tmp/agentforge.service"
+
+    cp agentforge.service.template "$SERVICE_FILE"
+    sed -i "s|{{USER}}|$USER|g"             "$SERVICE_FILE"
+    sed -i "s|{{WORKING_DIR}}|$INSTALL_DIR|g" "$SERVICE_FILE"
+    sed -i "s|{{NODE_PATH}}|$NODE_PATH|g"   "$SERVICE_FILE"
+    sed -i "s|{{NODE_BIN_DIR}}|$NODE_BIN_DIR|g" "$SERVICE_FILE"
+
+    sudo cp "$SERVICE_FILE" /etc/systemd/system/agentforge.service
+    sudo systemctl daemon-reload
+    rm "$SERVICE_FILE"
+    success "Service file installed"
+
+    sudo systemctl enable --now agentforge.service
+    success "Service enabled and started"
+
+    echo ""
+    sudo systemctl status agentforge.service --no-pager || true
   else
     info "Skipped. Run ./install-service.sh later to set up the service."
   fi
