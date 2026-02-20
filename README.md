@@ -104,7 +104,17 @@ Get AgentForge running in about five minutes.
 | 💬 Telegram bot token                            | From [@BotFather](https://t.me/BotFather) — free                          |
 | 🔑 AI Provider API access                        | Anthropic API key, Claude Code OAuth token, or OpenAI-compatible provider |
 
-### 1. Clone and run setup
+### Option A — One-liner install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pipassistant23/agentforge/main/install.sh | bash
+```
+
+Clones the repo, builds everything, prompts for your bot token and API key, writes `.env`, and optionally installs the systemd service — all in one step.
+
+### Option B — Manual install
+
+#### 1. Clone and run setup
 
 ```bash
 git clone https://github.com/pipassistant23/agentforge.git
@@ -118,7 +128,7 @@ The setup script will:
 - Create required directories (`/data/qmd`, `store/`)
 - Set proper permissions
 
-### 2. Configure your environment
+#### 2. Configure your environment
 
 ```bash
 cp .env.example .env
