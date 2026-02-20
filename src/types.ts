@@ -53,7 +53,17 @@ export interface Channel {
   ownsJid(jid: string): boolean;
   disconnect(): Promise<void>;
   // Optional: typing indicator. Channels that support it implement it.
-  setTyping?(jid: string, isTyping: boolean): Promise<void>;
+  // stats is passed on the final setTyping(false) call so channels can surface token usage.
+  setTyping?(
+    jid: string,
+    isTyping: boolean,
+    stats?: {
+      tokensIn?: number;
+      tokensOut?: number;
+      model?: string;
+      durationMs?: number;
+    },
+  ): Promise<void>;
 }
 
 // Callback type that channels use to deliver inbound messages

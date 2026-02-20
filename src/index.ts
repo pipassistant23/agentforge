@@ -24,9 +24,12 @@ import {
   TELEGRAM_BOT_POOL,
   TELEGRAM_BOT_TOKEN,
   TRIGGER_PATTERN,
+  SOCKET_ENABLED,
+  SOCKET_PATH,
 } from './config.js';
 import { TelegramChannel, initBotPool } from './channels/telegram.js';
 import { EmailChannel } from './channels/email.js';
+import { SocketChannel } from './channels/socket.js';
 import {
   AgentOutput,
   runContainerAgent,
@@ -266,6 +269,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   await channel.setTyping?.(chatJid, true);
   let hadError = false;
   let outputSentToUser = false;
+  let totalTokensIn = 0;
+  let totalTokensOut = 0;
+  let responseModel = '';
+  const agentStartTime = Date.now();
 
   const output = await runAgent(
     group,
@@ -293,13 +300,23 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         resetIdleTimer();
       }
 
+      // Accumulate token usage across all streaming chunks
+      if (result.tokensIn) totalTokensIn += result.tokensIn;
+      if (result.tokensOut) totalTokensOut += result.tokensOut;
+      if (result.model) responseModel = result.model;
+
       if (result.status === 'error') {
         hadError = true;
       }
     },
   );
 
-  await channel.setTyping?.(chatJid, false);
+  await channel.setTyping?.(chatJid, false, {
+    tokensIn: totalTokensIn || undefined,
+    tokensOut: totalTokensOut || undefined,
+    model: responseModel || undefined,
+    durationMs: Date.now() - agentStartTime,
+  });
   if (idleTimer) clearTimeout(idleTimer);
 
   if (output === 'error' || hadError) {
@@ -608,6 +625,15 @@ async function main(): Promise<void> {
   const channelOpts = {
     onMessage: (chatJid: string, msg: NewMessage) => {
       storeMessage(msg);
+      // Advance the global seen cursor so the message loop's safety-net poll
+      // doesn't re-discover and re-dispatch messages already handled here.
+      // Without this, the loop finds the message (lastTimestamp not yet advanced),
+      // sees an active agent process, pipes the message again, and emits a
+      // spurious typing indicator to the client.
+      if (msg.timestamp > lastTimestamp) {
+        lastTimestamp = msg.timestamp;
+        saveState();
+      }
       // Push-trigger: immediately enqueue a message check so the agent
       // dispatches without waiting for the next polling loop tick.
       queue.enqueueMessageCheck(chatJid);
@@ -647,6 +673,26 @@ async function main(): Promise<void> {
       logger.error(
         { err },
         'Failed to connect email channel — continuing without it',
+      );
+    }
+  }
+
+  // Initialize socket channel for local client connections (TUI, web, etc.)
+  if (SOCKET_ENABLED) {
+    try {
+      const socket = new SocketChannel({
+        ...channelOpts,
+        registerGroup,
+        groupFolder: MAIN_GROUP_FOLDER,
+        assistantName: ASSISTANT_NAME,
+      });
+      channels.push(socket);
+      await socket.connect();
+      logger.info({ path: SOCKET_PATH }, 'Socket channel listening');
+    } catch (err) {
+      logger.error(
+        { err },
+        'Failed to connect socket channel — continuing without it',
       );
     }
   }

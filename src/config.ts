@@ -1,3 +1,4 @@
+import os from 'os';
 import path from 'path';
 
 import { readEnvFile } from './env.js';
@@ -97,3 +98,8 @@ export const GMAIL_ALLOWED_SENDERS: string[] = process.env.GMAIL_ALLOWED_SENDERS
       s.trim().toLowerCase(),
     )
   : []; // empty = allow all (backward compat)
+
+// Socket channel configuration
+export const SOCKET_ENABLED: boolean = process.env.SOCKET_ENABLED !== 'false'; // on by default
+export const SOCKET_PATH: string =
+  process.env.SOCKET_PATH || path.join(os.homedir(), '.agentforge.sock');

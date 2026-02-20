@@ -923,3 +923,23 @@ function migrateJsonState(): void {
     }
   }
 }
+
+/**
+ * Fetch recent messages from socket connections for TUI history display.
+ * Returns the last N messages from any socket:* JID, in chronological order.
+ */
+export function getRecentSocketHistory(
+  limit: number,
+): { content: string; timestamp: string; is_from_me: number }[] {
+  const rows = db
+    .prepare(
+      `SELECT content, timestamp, is_from_me
+       FROM messages
+       WHERE chat_jid LIKE 'socket:%'
+       ORDER BY timestamp DESC
+       LIMIT ?`,
+    )
+    .all(limit) as { content: string; timestamp: string; is_from_me: number }[];
+  // Return in chronological order (oldest first)
+  return rows.reverse();
+}

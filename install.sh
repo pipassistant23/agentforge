@@ -342,6 +342,50 @@ else
   info "To run manually: cd $INSTALL_DIR && npm start"
 fi
 
+
+# ── CLI launcher ──────────────────────────────────────────────────────────────
+header "CLI launcher"
+
+# Make bin/agentforge executable
+chmod +x "$INSTALL_DIR/bin/agentforge"
+chmod +x "$INSTALL_DIR/bin/tui-client.js"
+
+# Create ~/.local/bin if it doesn't exist
+mkdir -p "$HOME/.local/bin"
+
+# Symlink agentforge command
+ln -sf "$INSTALL_DIR/bin/agentforge" "$HOME/.local/bin/agentforge"
+success "Linked: agentforge → $HOME/.local/bin/agentforge"
+
+# Read ASSISTANT_NAME from .env and create a lowercase symlink alias
+_AF_NAME=""
+if [ -f "$INSTALL_DIR/.env" ]; then
+  _AF_NAME="$(grep -E '^ASSISTANT_NAME=' "$INSTALL_DIR/.env" | head -1 | cut -d= -f2-)"
+fi
+_AF_NAME="${_AF_NAME:-AgentForge}"
+_AF_ALIAS="$(echo "$_AF_NAME" | tr '[:upper:]' '[:lower:]')"
+
+if [ "$_AF_ALIAS" != "agentforge" ] && [ -n "$_AF_ALIAS" ]; then
+  ln -sf "$INSTALL_DIR/bin/agentforge" "$HOME/.local/bin/$_AF_ALIAS"
+  success "Linked: $_AF_ALIAS → $HOME/.local/bin/$_AF_ALIAS"
+fi
+
+# Add ~/.local/bin to PATH in shell rc files if not already present
+_PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
+for _rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+  if [ -f "$_rc" ] && ! grep -q '.local/bin' "$_rc"; then
+    echo "" >> "$_rc"
+    echo "# Added by AgentForge installer" >> "$_rc"
+    echo "$_PATH_LINE" >> "$_rc"
+    success "Added ~/.local/bin to PATH in $_rc"
+  fi
+done
+
+# Check if ~/.local/bin is already in current PATH
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+  export PATH="$HOME/.local/bin:$PATH"
+fi
+
 exec 3<&-
 
 # ── Done ──────────────────────────────────────────────────────────────────────
@@ -349,11 +393,19 @@ header "Done"
 echo ""
 echo -e "AgentForge is installed at ${BOLD}$INSTALL_DIR${NC}"
 echo ""
+echo "Chat with your assistant:"
+echo "  agentforge        # Start the TUI chat client"
+if [ -n "${_AF_ALIAS:-}" ] && [ "$_AF_ALIAS" != "agentforge" ]; then
+  echo "  $_AF_ALIAS           # Same — shortcut alias"
+fi
+echo ""
 echo "Useful commands:"
 echo "  sudo systemctl status agentforge.service    # Check status"
 echo "  sudo systemctl restart agentforge.service   # Restart after .env changes"
 echo "  sudo journalctl -u agentforge.service -f    # Follow logs"
 echo "  $INSTALL_DIR/install-service.sh             # (Re)install systemd service"
+echo ""
+echo -e "If 'agentforge' is not found, run: source ~/.bashrc"
 echo ""
 echo "To uninstall:"
 echo "  curl -fsSL https://raw.githubusercontent.com/pipassistant23/agentforge/main/uninstall.sh | bash"

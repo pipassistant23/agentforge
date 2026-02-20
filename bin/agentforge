@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# AgentForge TUI client launcher
+set -euo pipefail
+
+INSTALL_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/.." && pwd)"
+SOCKET_PATH="${SOCKET_PATH:-$HOME/.agentforge.sock}"
+
+# Read ASSISTANT_NAME from .env
+ASSISTANT_NAME=""
+if [ -f "$INSTALL_DIR/.env" ]; then
+  ASSISTANT_NAME="$(grep -E '^ASSISTANT_NAME=' "$INSTALL_DIR/.env" | head -1 | cut -d= -f2-)"
+fi
+ASSISTANT_NAME="${ASSISTANT_NAME:-AgentForge}"
+
+# Check if socket file exists
+if [ ! -S "$SOCKET_PATH" ]; then
+  echo "Error: AgentForge socket not found at $SOCKET_PATH"
+  echo "The AgentForge service is not running."
+  echo ""
+  echo "Start it with:  sudo systemctl start agentforge.service"
+  echo "Check status:   sudo systemctl status agentforge.service"
+  exit 1
+fi
+
+exec node "$INSTALL_DIR/bin/tui-client.js" --socket "$SOCKET_PATH" --name "$ASSISTANT_NAME" "$@"
