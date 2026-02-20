@@ -28,7 +28,8 @@ interface GroupState {
 export class GroupQueue {
   private groups = new Map<string, GroupState>();
   private activeCount = 0;
-  private waitingGroups: string[] = [];
+  private waitingGroupsSet = new Set<string>();
+  private waitingGroupsQueue: string[] = [];
   private processMessagesFn: ((groupJid: string) => Promise<boolean>) | null =
     null;
   private shuttingDown = false;
@@ -50,6 +51,19 @@ export class GroupQueue {
     return state;
   }
 
+  private enqueueWaiting(jid: string): void {
+    if (!this.waitingGroupsSet.has(jid)) {
+      this.waitingGroupsSet.add(jid);
+      this.waitingGroupsQueue.push(jid);
+    }
+  }
+
+  private dequeueWaiting(): string | undefined {
+    const jid = this.waitingGroupsQueue.shift();
+    if (jid) this.waitingGroupsSet.delete(jid);
+    return jid;
+  }
+
   setProcessMessagesFn(fn: (groupJid: string) => Promise<boolean>): void {
     this.processMessagesFn = fn;
   }
@@ -67,9 +81,7 @@ export class GroupQueue {
 
     if (this.activeCount >= MAX_CONCURRENT_PROCESSES) {
       state.pendingMessages = true;
-      if (!this.waitingGroups.includes(groupJid)) {
-        this.waitingGroups.push(groupJid);
-      }
+      this.enqueueWaiting(groupJid);
       logger.debug(
         { groupJid, activeCount: this.activeCount },
         'At concurrency limit, message queued',
@@ -99,9 +111,7 @@ export class GroupQueue {
 
     if (this.activeCount >= MAX_CONCURRENT_PROCESSES) {
       state.pendingTasks.push({ id: taskId, groupJid, fn });
-      if (!this.waitingGroups.includes(groupJid)) {
-        this.waitingGroups.push(groupJid);
-      }
+      this.enqueueWaiting(groupJid);
       logger.debug(
         { groupJid, taskId, activeCount: this.activeCount },
         'At concurrency limit, task queued',
@@ -270,10 +280,10 @@ export class GroupQueue {
 
   private drainWaiting(): void {
     while (
-      this.waitingGroups.length > 0 &&
+      this.waitingGroupsQueue.length > 0 &&
       this.activeCount < MAX_CONCURRENT_PROCESSES
     ) {
-      const nextJid = this.waitingGroups.shift()!;
+      const nextJid = this.dequeueWaiting()!;
       const state = this.getGroup(nextJid);
 
       // Prioritize tasks over messages

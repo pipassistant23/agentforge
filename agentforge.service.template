@@ -20,6 +20,10 @@ ExecStart={{NODE_PATH}} {{WORKING_DIR}}/dist/index.js
 Restart=on-failure
 RestartSec=10s
 
+# Resource limits
+MemoryMax=2G
+LimitNOFILE=65536
+
 # Logging
 StandardOutput=journal
 StandardError=journal
