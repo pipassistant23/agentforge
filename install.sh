@@ -260,6 +260,72 @@ if command -v systemctl &>/dev/null; then
 
     echo ""
     sudo systemctl status agentforge.service --no-pager || true
+
+    # ── Register your Telegram chat ──────────────────────────────────────────
+    echo ""
+    header "Register your Telegram chat"
+    echo ""
+    echo "While AgentForge starts up, register your chat:"
+    echo "  1. Open Telegram and find your bot"
+    echo "  2. Send it:  /chatid"
+    echo "  3. Copy the Chat ID from the reply (e.g. tg:123456789)"
+    echo ""
+    read -u 3 -r -p "$(echo -e "Paste Chat ID here (or Enter to skip): ")" CHAT_ID
+    echo ""
+
+    if [[ -n "$CHAT_ID" ]]; then
+      CHAT_ID_NUM="${CHAT_ID#tg:}"
+      if [[ "$CHAT_ID_NUM" =~ ^-?[0-9]+$ ]]; then
+        CHAT_JID="tg:$CHAT_ID_NUM"
+        DB_PATH="$INSTALL_DIR/store/messages.db"
+        NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+        # Wait for the service to create the database (up to 15s)
+        if [ ! -f "$DB_PATH" ]; then
+          info "Waiting for database to initialise..."
+          for _i in $(seq 1 15); do
+            sleep 1
+            [ -f "$DB_PATH" ] && break
+          done
+        fi
+
+        if [ -f "$DB_PATH" ]; then
+          mkdir -p "$INSTALL_DIR/groups/main/logs"
+          sudo systemctl stop agentforge.service
+
+          if command -v sqlite3 &>/dev/null; then
+            sqlite3 "$DB_PATH" \
+              "INSERT OR REPLACE INTO registered_groups
+               (jid, name, folder, trigger_pattern, added_at, agent_config, requires_trigger)
+               VALUES ('$CHAT_JID', 'Main', 'main', '', '$NOW', NULL, 1);"
+          else
+            # Fallback: use the bundled better-sqlite3 via node
+            _TMPSCRIPT=$(mktemp /tmp/af-register-XXXXXX.cjs)
+            cat > "$_TMPSCRIPT" << 'REGJS'
+const Database = require('better-sqlite3');
+const db = new Database(process.argv[2]);
+db.prepare(
+  "INSERT OR REPLACE INTO registered_groups (jid, name, folder, trigger_pattern, added_at, agent_config, requires_trigger) VALUES (?, ?, ?, ?, ?, ?, ?)"
+).run(process.argv[3], 'Main', 'main', '', process.argv[4], null, 1);
+db.close();
+REGJS
+            (NODE_PATH="$INSTALL_DIR/node_modules" node "$_TMPSCRIPT" "$DB_PATH" "$CHAT_JID" "$NOW")
+            rm -f "$_TMPSCRIPT"
+          fi
+
+          sudo systemctl start agentforge.service
+          success "Registered $CHAT_JID — you can now message the bot!"
+        else
+          warn "Database not found after waiting — skipping registration."
+          warn "Check service logs: sudo journalctl -u agentforge.service -n 50"
+        fi
+      else
+        warn "Chat ID '$CHAT_ID' doesn't look valid — skipping."
+        info "Re-run /chatid in Telegram and paste the full reply (e.g. tg:123456789)."
+      fi
+    else
+      info "Skipped. You can register later — see the README for instructions."
+    fi
   else
     info "Skipped. Run ./install-service.sh later to set up the service."
   fi
