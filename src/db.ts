@@ -413,6 +413,8 @@ export function deleteTask(id: string): void {
 
 /**
  * Fetch all active tasks whose `next_run` is at or before the current time.
+ * Excludes tasks with status `'in-progress'` to prevent double-queuing when
+ * a task execution takes longer than the scheduler poll interval (60 s).
  * Results are ordered by `next_run` so the oldest overdue tasks run first.
  */
 export function getDueTasks(): ScheduledTask[] {
@@ -426,6 +428,33 @@ export function getDueTasks(): ScheduledTask[] {
   `,
     )
     .all(now) as ScheduledTask[];
+}
+
+/**
+ * Mark a task as `'in-progress'` when execution begins.
+ * This prevents `getDueTasks()` from picking it up again on the next poll tick
+ * while the first execution is still running.
+ *
+ * @param id - The task ID to mark in-progress
+ */
+export function setTaskInProgress(id: string): void {
+  db.prepare(
+    `UPDATE scheduled_tasks SET status = 'in-progress' WHERE id = ?`,
+  ).run(id);
+}
+
+/**
+ * Reset a task's status from `'in-progress'` back to `'active'` after a run
+ * completes (success or error). One-shot tasks ('once') are handled by
+ * `updateTaskAfterRun` which sets them to 'completed'; this function is only
+ * called for recurring tasks that need to remain schedulable.
+ *
+ * @param id - The task ID to reset
+ */
+export function resetTaskFromInProgress(id: string): void {
+  db.prepare(
+    `UPDATE scheduled_tasks SET status = 'active' WHERE id = ? AND status = 'in-progress'`,
+  ).run(id);
 }
 
 /**
@@ -448,7 +477,14 @@ export function updateTaskAfterRun(
   db.prepare(
     `
     UPDATE scheduled_tasks
-    SET next_run = ?, last_run = ?, last_result = ?, status = CASE WHEN ? IS NULL THEN 'completed' ELSE status END
+    SET next_run = ?,
+        last_run = ?,
+        last_result = ?,
+        status = CASE
+          WHEN ? IS NULL THEN 'completed'
+          WHEN status = 'in-progress' THEN 'active'
+          ELSE status
+        END
     WHERE id = ?
   `,
   ).run(nextRun, now, lastResult, nextRun, id);
