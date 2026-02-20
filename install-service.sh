@@ -37,6 +37,10 @@ if [ ! -f "$WORKING_DIR/.env" ]; then
   echo "   The service needs a .env file with your credentials."
   echo "   Copy .env.example to .env and configure it before starting the service."
   echo ""
+else
+  chmod 600 "$WORKING_DIR/.env"
+  echo -e "${GREEN}✅ .env permissions set to 600 (owner read/write only)${NC}"
+  echo ""
 fi
 
 # Check if dist/index.js exists
