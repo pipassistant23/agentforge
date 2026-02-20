@@ -91,10 +91,10 @@ echo -e "${GREEN}✅ Service installed${NC}"
 echo ""
 
 # Ask to enable and start
-read -p "Enable and start the service now? [y/N] " -n 1 -r
+read -p "Enable and start the service now? [Y/n] " -n 1 -r
 echo ""
 
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+if [[ ! $REPLY =~ ^[Nn]$ ]]; then
   sudo systemctl enable agentforge.service
   sudo systemctl start agentforge.service
 
