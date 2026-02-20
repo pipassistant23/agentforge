@@ -15,6 +15,27 @@ export interface TelegramChannelOpts {
   registeredGroups: () => Record<string, RegisteredGroup>;
 }
 
+/**
+ * Split a message into chunks no longer than maxLength characters.
+ * Splits at the last space or newline before the limit so words are
+ * never cut mid-stream. Falls back to a hard split when a single word
+ * exceeds maxLength.
+ */
+function splitMessage(text: string, maxLength: number): string[] {
+  const chunks: string[] = [];
+  let remaining = text;
+  while (remaining.length > maxLength) {
+    let splitAt = remaining.lastIndexOf(' ', maxLength);
+    const newlineAt = remaining.lastIndexOf('\n', maxLength);
+    splitAt = Math.max(splitAt, newlineAt);
+    if (splitAt <= 0) splitAt = maxLength; // fallback: hard split
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt).trimStart();
+  }
+  if (remaining.length > 0) chunks.push(remaining);
+  return chunks;
+}
+
 // Bot pool for agent teams: send-only Api instances (no polling)
 const poolApis: Api[] = [];
 // Maps "{groupFolder}:{senderName}" → pool Api index for stable assignment
@@ -203,15 +224,8 @@ export class TelegramChannel implements Channel {
 
       // Telegram has a 4096 character limit per message — split if needed
       const MAX_LENGTH = 4096;
-      if (text.length <= MAX_LENGTH) {
-        await this.bot.api.sendMessage(numericId, text);
-      } else {
-        for (let i = 0; i < text.length; i += MAX_LENGTH) {
-          await this.bot.api.sendMessage(
-            numericId,
-            text.slice(i, i + MAX_LENGTH),
-          );
-        }
+      for (const chunk of splitMessage(text, MAX_LENGTH)) {
+        await this.bot.api.sendMessage(numericId, chunk);
       }
       logger.info({ jid, length: text.length }, 'Telegram message sent');
     } catch (err) {
@@ -316,12 +330,8 @@ export async function sendPoolMessage(
   try {
     const numericId = chatId.replace(/^tg:/, '');
     const MAX_LENGTH = 4096;
-    if (text.length <= MAX_LENGTH) {
-      await api.sendMessage(numericId, text);
-    } else {
-      for (let i = 0; i < text.length; i += MAX_LENGTH) {
-        await api.sendMessage(numericId, text.slice(i, i + MAX_LENGTH));
-      }
+    for (const chunk of splitMessage(text, MAX_LENGTH)) {
+      await api.sendMessage(numericId, chunk);
     }
     logger.info(
       { chatId, sender, poolIndex: idx, length: text.length },
