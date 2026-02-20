@@ -369,6 +369,19 @@ export async function runContainerAgent(
       // Stream-parse for output markers
       if (onOutput) {
         parseBuffer += chunk;
+
+        // Guard against unbounded parseBuffer growth (e.g. a missing END marker).
+        if (parseBuffer.length > AGENT_MAX_OUTPUT_SIZE) {
+          logger.warn(
+            { group: group.name, size: parseBuffer.length },
+            'parseBuffer exceeded size cap -- truncating to prevent heap growth',
+          );
+          // Preserve the last OUTPUT_START_MARKER fragment so an in-progress
+          // frame can still complete; clear entirely if no marker is present.
+          const lastStart = parseBuffer.lastIndexOf(OUTPUT_START_MARKER);
+          parseBuffer = lastStart !== -1 ? parseBuffer.slice(lastStart) : '';
+        }
+
         let startIdx: number;
         while ((startIdx = parseBuffer.indexOf(OUTPUT_START_MARKER)) !== -1) {
           const endIdx = parseBuffer.indexOf(OUTPUT_END_MARKER, startIdx);

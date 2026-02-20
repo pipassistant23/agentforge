@@ -640,17 +640,17 @@ describe('register_group success', () => {
   });
 
   it('register_group rejects request with missing fields', async () => {
-    await processTaskIpc(
-      {
+    // With Zod validation, incomplete payloads are rejected by IpcTaskPayloadSchema.parse()
+    // before they ever reach processTaskIpc. Verify the schema throws for missing fields.
+    const { IpcTaskPayloadSchema } = await import('./ipc-protocol.js');
+    expect(() =>
+      IpcTaskPayloadSchema.parse({
         type: 'register_group',
         jid: 'partial@g.us',
         name: 'Partial',
         // missing folder and trigger
-      },
-      'main',
-      true,
-      deps,
-    );
+      }),
+    ).toThrow();
 
     expect(getRegisteredGroup('partial@g.us')).toBeUndefined();
   });

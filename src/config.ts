@@ -36,6 +36,16 @@ export const DATA_DIR = process.env.DATA_DIR
 // Main group folder name (default group for global operations)
 export const MAIN_GROUP_FOLDER = process.env.MAIN_GROUP_FOLDER || 'main';
 
+// Data retention periods
+export const MESSAGE_RETENTION_DAYS = parseInt(
+  process.env.MESSAGE_RETENTION_DAYS || '90',
+  10,
+);
+export const TASK_LOG_RETENTION_DAYS = parseInt(
+  process.env.TASK_LOG_RETENTION_DAYS || '30',
+  10,
+);
+
 // Agent execution limits
 export const AGENT_TIMEOUT = parseInt(
   process.env.AGENT_TIMEOUT || '1800000',
