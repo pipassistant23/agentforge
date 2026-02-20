@@ -35,6 +35,7 @@ import {
 } from './bare-metal-runner.js';
 import {
   getAllChats,
+  getAllPendingCursors,
   getAllRegisteredGroups,
   getAllSessions,
   getAllTasks,
@@ -42,9 +43,11 @@ import {
   getNewMessages,
   getRouterState,
   initDatabase,
+  clearPendingCursor,
   setRegisteredGroup,
   setRouterState,
   setSession,
+  setPendingCursor,
   storeChatMetadata,
   storeMessage,
 } from './db.js';
@@ -216,12 +219,13 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   const prompt = formatMessages(missedMessages);
 
-  // Advance cursor so the piping path in startMessageLoop won't re-fetch
-  // these messages. Save the old cursor so we can roll back on error.
+  // Two-phase commit: write a pending cursor before dispatching the agent.
+  // If the process crashes between here and the success path below,
+  // recoverPendingMessages() will detect the dangling pending cursor on the
+  // next startup and requeue the messages.
   const previousCursor = lastAgentTimestamp[chatJid] || '';
-  lastAgentTimestamp[chatJid] =
-    missedMessages[missedMessages.length - 1].timestamp;
-  saveState();
+  const newCursor = missedMessages[missedMessages.length - 1].timestamp;
+  setPendingCursor(chatJid, newCursor);
 
   logger.info(
     { group: group.name, messageCount: missedMessages.length },
@@ -294,17 +298,26 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
         { group: group.name },
         'Agent error after output was sent, skipping cursor rollback to prevent duplicates',
       );
+      // Promote cursor and clear pending even on partial-error so we don't replay
+      lastAgentTimestamp[chatJid] = newCursor;
+      saveState();
+      clearPendingCursor(chatJid);
       return true;
     }
-    // Roll back cursor so retries can re-process these messages
-    lastAgentTimestamp[chatJid] = previousCursor;
-    saveState();
+    // Agent failed before sending any output — clear the pending cursor and
+    // leave lastAgentTimestamp at previousCursor so retries can re-process.
+    clearPendingCursor(chatJid);
     logger.warn(
       { group: group.name },
-      'Agent error, rolled back message cursor for retry',
+      'Agent error, cleared pending cursor for retry',
     );
     return false;
   }
+
+  // Success: promote pending cursor to the real cursor, then clear pending.
+  lastAgentTimestamp[chatJid] = newCursor;
+  saveState();
+  clearPendingCursor(chatJid);
 
   return true;
 }
@@ -483,8 +496,14 @@ async function startMessageLoop(): Promise<void> {
               { chatJid, count: messagesToSend.length },
               'Piped messages to active process',
             );
-            lastAgentTimestamp[chatJid] =
+            // Write pending cursor before advancing the confirmed cursor.
+            // The active process is responsible for clearing it on success;
+            // if it crashes, recoverPendingMessages() will requeue from the
+            // last confirmed lastAgentTimestamp.
+            const pipedCursor =
               messagesToSend[messagesToSend.length - 1].timestamp;
+            setPendingCursor(chatJid, pipedCursor);
+            lastAgentTimestamp[chatJid] = pipedCursor;
             saveState();
             // Show typing indicator while the process processes the piped message
             const channel = findChannel(channels, chatJid);
@@ -504,11 +523,35 @@ async function startMessageLoop(): Promise<void> {
 
 /**
  * Startup recovery: check for unprocessed messages in registered groups.
- * Handles the crash window between advancing lastTimestamp and the agent
- * finishing its run — without this, those messages would be silently dropped.
+ *
+ * Two cases are handled:
+ *
+ * 1. Normal unprocessed messages: messages that arrived after the last known
+ *    agent cursor (lastAgentTimestamp) with no pending cursor — the agent
+ *    simply never ran for them yet.
+ *
+ * 2. Crash-in-flight (two-phase commit): a pending_cursors row exists and is
+ *    ahead of lastAgentTimestamp. This means the previous run wrote a pending
+ *    cursor but crashed before the agent confirmed delivery. The pending cursor
+ *    is cleared so processGroupMessages will re-process from lastAgentTimestamp.
  */
 function recoverPendingMessages(): void {
+  const pendingCursors = getAllPendingCursors();
+
   for (const [chatJid, group] of Object.entries(registeredGroups)) {
+    // Case 2: crash-in-flight — a pending cursor exists from a previous run
+    // that never completed. Clear it so the group reprocesses from the last
+    // confirmed agent cursor.
+    if (pendingCursors[chatJid]) {
+      logger.warn(
+        { group: group.name, pendingCursor: pendingCursors[chatJid] },
+        'Recovery: found dangling pending cursor (crash-in-flight), clearing and requeuing',
+      );
+      clearPendingCursor(chatJid);
+    }
+
+    // Case 1 (and also requeue for Case 2): check for messages since last
+    // confirmed agent cursor.
     const sinceTimestamp = lastAgentTimestamp[chatJid] || '';
     const pending = getMessagesSince(chatJid, sinceTimestamp, ASSISTANT_NAME);
     if (pending.length > 0) {
