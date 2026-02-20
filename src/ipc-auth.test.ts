@@ -576,23 +576,24 @@ describe('schedule_task context_mode', () => {
     expect(tasks[0].context_mode).toBe('isolated');
   });
 
-  it('defaults invalid context_mode to isolated', async () => {
-    await processTaskIpc(
-      {
+  it('rejects invalid context_mode via Zod schema', async () => {
+    // With Zod validation, invalid context_mode values are rejected at parse time
+    // before processTaskIpc is ever called - the task is never created.
+    const { IpcTaskPayloadSchema } = await import('./ipc-protocol.js');
+    expect(() =>
+      IpcTaskPayloadSchema.parse({
         type: 'schedule_task',
         prompt: 'bad context',
         schedule_type: 'once',
         schedule_value: '2025-06-01T00:00:00.000Z',
-        context_mode: 'bogus' as any,
+        context_mode: 'bogus',
         targetJid: 'other@g.us',
-      },
-      'main',
-      true,
-      deps,
-    );
+      }),
+    ).toThrow();
 
+    // No task should have been created
     const tasks = getAllTasks();
-    expect(tasks[0].context_mode).toBe('isolated');
+    expect(tasks).toHaveLength(0);
   });
 
   it('defaults missing context_mode to isolated', async () => {
