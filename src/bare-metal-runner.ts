@@ -62,6 +62,45 @@ export interface AvailableGroup {
 }
 
 /**
+ * A successfully parsed agent output message extracted from the stdout stream.
+ */
+export interface ParsedMessage {
+  parsed: AgentOutput;
+  raw: string;
+}
+
+/**
+ * Pure function: advance a sentinel-delimited parse buffer by one chunk.
+ */
+export function parseOutputChunks(
+  buffer: string,
+  chunk: string,
+): { buffer: string; messages: ParsedMessage[] } {
+  let current = buffer + chunk;
+  const messages: ParsedMessage[] = [];
+
+  let startIdx: number;
+  while ((startIdx = current.indexOf(OUTPUT_START_MARKER)) !== -1) {
+    const endIdx = current.indexOf(OUTPUT_END_MARKER, startIdx);
+    if (endIdx === -1) break; // Incomplete pair — wait for more data
+
+    const raw = current
+      .slice(startIdx + OUTPUT_START_MARKER.length, endIdx)
+      .trim();
+    current = current.slice(endIdx + OUTPUT_END_MARKER.length);
+
+    try {
+      const parsed: AgentOutput = JSON.parse(raw);
+      messages.push({ parsed, raw });
+    } catch {
+      // Malformed JSON — skip silently so callers can decide how to handle
+    }
+  }
+
+  return { buffer: current, messages };
+}
+
+/**
  * Load API credentials from the environment file.
  * These are passed to the agent process via stdin rather than environment
  * variables so they stay out of /proc and child process environments.
@@ -132,6 +171,12 @@ function setupGroupSession(group: RegisteredGroup): string {
       for (const file of fs.readdirSync(srcDir)) {
         const srcFile = path.join(srcDir, file);
         const dstFile = path.join(dstDir, file);
+        if (
+          fs.existsSync(dstFile) &&
+          fs.statSync(dstFile).mtimeMs >= fs.statSync(srcFile).mtimeMs
+        ) {
+          continue;
+        }
         fs.copyFileSync(srcFile, dstFile);
       }
     }
@@ -152,9 +197,14 @@ function setupGroupSession(group: RegisteredGroup): string {
   for (const templateFile of sharedTemplateFiles) {
     const srcFile = path.join(globalWorkspace, templateFile);
     const dstFile = path.join(groupWorkspace, templateFile);
-    if (fs.existsSync(srcFile)) {
-      fs.copyFileSync(srcFile, dstFile);
+    if (!fs.existsSync(srcFile)) continue;
+    if (
+      fs.existsSync(dstFile) &&
+      fs.statSync(dstFile).mtimeMs >= fs.statSync(srcFile).mtimeMs
+    ) {
+      continue;
     }
+    fs.copyFileSync(srcFile, dstFile);
   }
 
   // Ensure group-specific template files exist
@@ -259,7 +309,10 @@ export async function runContainerAgent(
     // Spawn agent as baremetal Node.js process
     const agentProcess = spawn(
       'node',
-      [path.join(process.cwd(), 'agent-runner-src/dist/index.js')],
+      [
+        '--max-old-space-size=512',
+        path.join(process.cwd(), 'agent-runner-src/dist/index.js'),
+      ],
       {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: path.join(GROUPS_DIR, group.folder),
@@ -366,43 +419,40 @@ export async function runContainerAgent(
         }
       }
 
-      // Stream-parse for output markers
+      // Stream-parse for output markers using the pure parseOutputChunks helper.
+      // parseBuffer holds any incomplete frame tail across chunks.
       if (onOutput) {
-        parseBuffer += chunk;
-        let startIdx: number;
-        while ((startIdx = parseBuffer.indexOf(OUTPUT_START_MARKER)) !== -1) {
-          const endIdx = parseBuffer.indexOf(OUTPUT_END_MARKER, startIdx);
-          if (endIdx === -1) break; // Incomplete pair, wait for more data
+        // Guard against unbounded parseBuffer growth (e.g. a missing END marker).
+        if (parseBuffer.length + chunk.length > AGENT_MAX_OUTPUT_SIZE) {
+          logger.warn(
+            { group: group.name, size: parseBuffer.length + chunk.length },
+            'parseBuffer exceeded size cap -- truncating to prevent heap growth',
+          );
+          // Preserve the last OUTPUT_START_MARKER fragment so an in-progress
+          // frame can still complete; clear entirely if no marker is present.
+          const lastStart = parseBuffer.lastIndexOf(OUTPUT_START_MARKER);
+          parseBuffer = lastStart !== -1 ? parseBuffer.slice(lastStart) : '';
+        }
+        const result = parseOutputChunks(parseBuffer, chunk);
+        parseBuffer = result.buffer;
 
-          const jsonStr = parseBuffer
-            .slice(startIdx + OUTPUT_START_MARKER.length, endIdx)
-            .trim();
-          parseBuffer = parseBuffer.slice(endIdx + OUTPUT_END_MARKER.length);
-
-          try {
-            const parsed: AgentOutput = JSON.parse(jsonStr);
-            if (parsed.newSessionId) {
-              newSessionId = parsed.newSessionId;
-            }
-            hadStreamingOutput = true;
-            // Activity detected — reset the hard timeout
-            resetTimeout();
-            // Call onOutput for all markers (including null results)
-            // SECURITY: Add error handler to prevent unhandled rejections
-            outputChain = outputChain
-              .then(() => onOutput(parsed))
-              .catch((err) => {
-                logger.error(
-                  { group: group.name, error: err },
-                  'Error in output callback, will continue processing',
-                );
-              });
-          } catch (err) {
-            logger.warn(
-              { group: group.name, error: err },
-              'Failed to parse streamed output chunk',
-            );
+        for (const { parsed } of result.messages) {
+          if (parsed.newSessionId) {
+            newSessionId = parsed.newSessionId;
           }
+          hadStreamingOutput = true;
+          // Activity detected — reset the hard timeout
+          resetTimeout();
+          // Call onOutput for all markers (including null results)
+          // SECURITY: Add error handler to prevent unhandled rejections
+          outputChain = outputChain
+            .then(() => onOutput(parsed))
+            .catch((err) => {
+              logger.error(
+                { group: group.name, error: err },
+                'Error in output callback, will continue processing',
+              );
+            });
         }
       }
     });

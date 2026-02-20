@@ -49,6 +49,53 @@ export interface IpcDeps {
 let ipcWatcherRunning = false;
 
 /**
+ * Clean up stale files from the IPC `errors/` directory.
+ *
+ * - Logs a warning if more than 50 files are present (alerting threshold).
+ * - Deletes files older than 7 days so the directory does not grow unboundedly.
+ *
+ * @param ipcBaseDir - The IPC base directory containing the `errors/` subdirectory
+ */
+function cleanupIpcErrors(ipcBaseDir: string): void {
+  const errorDir = path.join(ipcBaseDir, 'errors');
+  if (!fs.existsSync(errorDir)) return;
+
+  let files: string[];
+  try {
+    files = fs.readdirSync(errorDir);
+  } catch (err) {
+    logger.error({ err }, 'Failed to read IPC errors directory during cleanup');
+    return;
+  }
+
+  if (files.length > 50) {
+    logger.warn(
+      { count: files.length, errorDir },
+      'IPC errors/ directory has more than 50 files -- investigate recurring failures',
+    );
+  }
+
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  let deleted = 0;
+  for (const file of files) {
+    const filePath = path.join(errorDir, file);
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.mtimeMs < sevenDaysAgo) {
+        fs.unlinkSync(filePath);
+        deleted++;
+      }
+    } catch (err) {
+      logger.warn({ file, err }, 'Failed to stat/delete IPC error file');
+    }
+  }
+
+  if (deleted > 0) {
+    logger.info({ deleted }, 'IPC errors/ cleanup: removed old error files');
+  }
+}
+
+/**
  * Start the polling loop that processes IPC files from agent processes.
  *
  * Scans all group subdirectories under the IPC base directory on each tick,
@@ -70,6 +117,11 @@ export function startIpcWatcher(deps: IpcDeps): void {
 
   const ipcBaseDir = path.join(DATA_DIR, 'ipc');
   fs.mkdirSync(ipcBaseDir, { recursive: true });
+
+  // Run error-dir cleanup once at startup, then every hour
+  cleanupIpcErrors(ipcBaseDir);
+  const IPC_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+  setInterval(() => cleanupIpcErrors(ipcBaseDir), IPC_CLEANUP_INTERVAL_MS);
 
   const processIpcFiles = async () => {
     // Scan all group IPC directories (identity determined by directory)
