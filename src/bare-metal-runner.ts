@@ -62,6 +62,45 @@ export interface AvailableGroup {
 }
 
 /**
+ * A successfully parsed agent output message extracted from the stdout stream.
+ */
+export interface ParsedMessage {
+  parsed: AgentOutput;
+  raw: string;
+}
+
+/**
+ * Pure function: advance a sentinel-delimited parse buffer by one chunk.
+ */
+export function parseOutputChunks(
+  buffer: string,
+  chunk: string,
+): { buffer: string; messages: ParsedMessage[] } {
+  let current = buffer + chunk;
+  const messages: ParsedMessage[] = [];
+
+  let startIdx: number;
+  while ((startIdx = current.indexOf(OUTPUT_START_MARKER)) !== -1) {
+    const endIdx = current.indexOf(OUTPUT_END_MARKER, startIdx);
+    if (endIdx === -1) break; // Incomplete pair — wait for more data
+
+    const raw = current
+      .slice(startIdx + OUTPUT_START_MARKER.length, endIdx)
+      .trim();
+    current = current.slice(endIdx + OUTPUT_END_MARKER.length);
+
+    try {
+      const parsed: AgentOutput = JSON.parse(raw);
+      messages.push({ parsed, raw });
+    } catch {
+      // Malformed JSON — skip silently so callers can decide how to handle
+    }
+  }
+
+  return { buffer: current, messages };
+}
+
+/**
  * Load API credentials from the environment file.
  * These are passed to the agent process via stdin rather than environment
  * variables so they stay out of /proc and child process environments.
@@ -380,14 +419,13 @@ export async function runContainerAgent(
         }
       }
 
-      // Stream-parse for output markers
+      // Stream-parse for output markers using the pure parseOutputChunks helper.
+      // parseBuffer holds any incomplete frame tail across chunks.
       if (onOutput) {
-        parseBuffer += chunk;
-
         // Guard against unbounded parseBuffer growth (e.g. a missing END marker).
-        if (parseBuffer.length > AGENT_MAX_OUTPUT_SIZE) {
+        if (parseBuffer.length + chunk.length > AGENT_MAX_OUTPUT_SIZE) {
           logger.warn(
-            { group: group.name, size: parseBuffer.length },
+            { group: group.name, size: parseBuffer.length + chunk.length },
             'parseBuffer exceeded size cap -- truncating to prevent heap growth',
           );
           // Preserve the last OUTPUT_START_MARKER fragment so an in-progress
@@ -396,40 +434,26 @@ export async function runContainerAgent(
           parseBuffer = lastStart !== -1 ? parseBuffer.slice(lastStart) : '';
         }
 
-        let startIdx: number;
-        while ((startIdx = parseBuffer.indexOf(OUTPUT_START_MARKER)) !== -1) {
-          const endIdx = parseBuffer.indexOf(OUTPUT_END_MARKER, startIdx);
-          if (endIdx === -1) break; // Incomplete pair, wait for more data
+        const result = parseOutputChunks(parseBuffer, chunk);
+        parseBuffer = result.buffer;
 
-          const jsonStr = parseBuffer
-            .slice(startIdx + OUTPUT_START_MARKER.length, endIdx)
-            .trim();
-          parseBuffer = parseBuffer.slice(endIdx + OUTPUT_END_MARKER.length);
-
-          try {
-            const parsed: AgentOutput = JSON.parse(jsonStr);
-            if (parsed.newSessionId) {
-              newSessionId = parsed.newSessionId;
-            }
-            hadStreamingOutput = true;
-            // Activity detected — reset the hard timeout
-            resetTimeout();
-            // Call onOutput for all markers (including null results)
-            // SECURITY: Add error handler to prevent unhandled rejections
-            outputChain = outputChain
-              .then(() => onOutput(parsed))
-              .catch((err) => {
-                logger.error(
-                  { group: group.name, error: err },
-                  'Error in output callback, will continue processing',
-                );
-              });
-          } catch (err) {
-            logger.warn(
-              { group: group.name, error: err },
-              'Failed to parse streamed output chunk',
-            );
+        for (const { parsed } of result.messages) {
+          if (parsed.newSessionId) {
+            newSessionId = parsed.newSessionId;
           }
+          hadStreamingOutput = true;
+          // Activity detected — reset the hard timeout
+          resetTimeout();
+          // Call onOutput for all markers (including null results)
+          // SECURITY: Add error handler to prevent unhandled rejections
+          outputChain = outputChain
+            .then(() => onOutput(parsed))
+            .catch((err) => {
+              logger.error(
+                { group: group.name, error: err },
+                'Error in output callback, will continue processing',
+              );
+            });
         }
       }
     });
