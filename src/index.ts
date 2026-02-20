@@ -625,6 +625,15 @@ async function main(): Promise<void> {
   const channelOpts = {
     onMessage: (chatJid: string, msg: NewMessage) => {
       storeMessage(msg);
+      // Advance the global seen cursor so the message loop's safety-net poll
+      // doesn't re-discover and re-dispatch messages already handled here.
+      // Without this, the loop finds the message (lastTimestamp not yet advanced),
+      // sees an active agent process, pipes the message again, and emits a
+      // spurious typing indicator to the client.
+      if (msg.timestamp > lastTimestamp) {
+        lastTimestamp = msg.timestamp;
+        saveState();
+      }
       // Push-trigger: immediately enqueue a message check so the agent
       // dispatches without waiting for the next polling loop tick.
       queue.enqueueMessageCheck(chatJid);
