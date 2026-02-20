@@ -35,13 +35,16 @@ import {
 } from './bare-metal-runner.js';
 import {
   getAllChats,
+  getAllCursors,
   getAllRegisteredGroups,
   getAllSessions,
   getAllTasks,
+  getCursor,
   getMessagesSince,
   getNewMessages,
   getRouterState,
   initDatabase,
+  setCursor,
   setRegisteredGroup,
   setRouterState,
   setSession,
@@ -75,8 +78,9 @@ let registeredGroups: Record<string, RegisteredGroup> = {};
 
 /**
  * Per-group cursor tracking the last message that was handed off to an agent.
- * Separate from lastTimestamp so the agent can catch up missed messages
- * independently from the "seen" cursor that prevents double-processing.
+ * In-memory cache of the agent_cursors SQLite table. The DB is the source of
+ * truth; this map is warmed from getAllCursors() on startup and kept in sync
+ * via setCursor() on every write.
  */
 let lastAgentTimestamp: Record<string, string> = {};
 
@@ -95,13 +99,9 @@ const queue = new GroupQueue();
  */
 function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
-  const agentTs = getRouterState('last_agent_timestamp');
-  try {
-    lastAgentTimestamp = agentTs ? JSON.parse(agentTs) : {};
-  } catch {
-    logger.warn('Corrupted last_agent_timestamp in DB, resetting');
-    lastAgentTimestamp = {};
-  }
+  // Load per-group agent cursors from the dedicated agent_cursors table.
+  // Each row is an independent UPSERT so a write failure only affects one group.
+  lastAgentTimestamp = getAllCursors();
   sessions = getAllSessions();
   registeredGroups = getAllRegisteredGroups();
   logger.info(
@@ -114,9 +114,25 @@ function loadState(): void {
  * Persist the message-seen and agent-processed cursors to the DB.
  * Called after advancing either cursor so crashes don't replay messages.
  */
+/**
+ * Persist the message-seen cursor to the DB.
+ * Agent cursors are now written atomically per-group via setCursor(); this
+ * function only needs to persist the global lastTimestamp.
+ */
 function saveState(): void {
   setRouterState('last_timestamp', lastTimestamp);
-  setRouterState('last_agent_timestamp', JSON.stringify(lastAgentTimestamp));
+}
+
+/**
+ * Advance the agent cursor for a single group and persist it atomically.
+ * Updates both the in-memory cache and the agent_cursors DB row.
+ *
+ * @param chatJid - The chat JID whose cursor should advance
+ * @param timestamp - The new cursor timestamp
+ */
+function advanceCursor(chatJid: string, timestamp: string): void {
+  lastAgentTimestamp[chatJid] = timestamp;
+  setCursor(chatJid, timestamp);
 }
 
 /**
@@ -219,9 +235,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
   const previousCursor = lastAgentTimestamp[chatJid] || '';
-  lastAgentTimestamp[chatJid] =
-    missedMessages[missedMessages.length - 1].timestamp;
-  saveState();
+  advanceCursor(chatJid, missedMessages[missedMessages.length - 1].timestamp);
 
   logger.info(
     { group: group.name, messageCount: missedMessages.length },
@@ -297,8 +311,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       return true;
     }
     // Roll back cursor so retries can re-process these messages
-    lastAgentTimestamp[chatJid] = previousCursor;
-    saveState();
+    advanceCursor(chatJid, previousCursor);
     logger.warn(
       { group: group.name },
       'Agent error, rolled back message cursor for retry',
@@ -490,9 +503,10 @@ async function startMessageLoop(): Promise<void> {
               { chatJid, count: messagesToSend.length },
               'Piped messages to active process',
             );
-            lastAgentTimestamp[chatJid] =
-              messagesToSend[messagesToSend.length - 1].timestamp;
-            saveState();
+            advanceCursor(
+              chatJid,
+              messagesToSend[messagesToSend.length - 1].timestamp,
+            );
             // Show typing indicator while the process processes the piped message
             const channel = findChannel(channels, chatJid);
             channel?.setTyping?.(chatJid, true);
